@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 from typing import Dict
-from app.api import appointments_router, doctors_router
+from app.api import appointments_router, doctors_router, patient_registration_router
 from app.api.appointment_detail import router as appointment_detail_router
 from app.core.config import ALLOWED_ORIGINS
 from app.utils.time import now_hk
@@ -56,6 +56,13 @@ def create_app() -> FastAPI:
             appointment_detail_router,
             prefix="/api/v1/appointments",
             tags=["appointment-detail"]
+        )
+        
+        # 註冊患者登記路由
+        app.include_router(
+            patient_registration_router,
+            prefix="/api/v1/patient_registration",
+            tags=["patient-registration"]
         )
 
         @app.get("/")

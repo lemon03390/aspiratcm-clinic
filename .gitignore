@@ -37,3 +37,5 @@ cursor.json
 # Logs
 *.log
 logs/
+
+.cursor/
