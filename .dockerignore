@@ -1,0 +1,14 @@
+# 不要複製這些大型或無用資料夾
+node_modules
+__pycache__
+*.pyc
+*.db
+.venv
+.DS_Store
+.next
+
+# 忽略所有 .env 檔案
+.env*
+
+# 但允許 docker 專用的這一個
+!.env.docker

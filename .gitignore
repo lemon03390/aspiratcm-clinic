@@ -1,0 +1,39 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+*.egg-info/
+*.egg
+*.pkl
+*.sqlite3
+
+# Environment Files
+.env
+.env.*
+*.pem
+
+# Mac 系統自動產生的檔案
+.DS_Store
+
+# VSCode 設定
+.vscode/
+*.code-workspace
+
+# Docker
+*.log
+docker-compose.override.yml
+
+# Cursor AI
+.cursor/
+cursor.json
+
+# Logs
+*.log
+logs/

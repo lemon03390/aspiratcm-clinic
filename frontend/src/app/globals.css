@@ -1,0 +1,638 @@
+@import 'react-datepicker/dist/react-datepicker.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 基礎樣式 */
+html, body {
+  padding: 0;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
+    Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
+}
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+  --primary-color: 37, 99, 235;
+  --primary-dark: 29, 78, 216;
+  --secondary-color: 14, 165, 233;
+  --accent-color: 249, 115, 22;
+  --success-color: 34, 197, 94;
+  --warning-color: 234, 179, 8;
+  --danger-color: 239, 68, 68;
+  --neutral-50: 249, 250, 251;
+  --neutral-100: 243, 244, 246;
+  --neutral-200: 229, 231, 235;
+  --neutral-300: 209, 213, 219;
+  --neutral-400: 156, 163, 175;
+  --neutral-500: 107, 114, 128;
+  --neutral-600: 75, 85, 99;
+  --neutral-700: 55, 65, 81;
+  --neutral-800: 31, 41, 55;
+  --neutral-900: 17, 24, 39;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-end-rgb));
+  line-height: 1.5;
+}
+
+a {
+  color: rgb(var(--primary-color));
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  color: rgb(var(--primary-dark));
+}
+
+/* 布局組件 */
+.container {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+.card {
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid rgb(var(--neutral-200));
+  font-weight: 600;
+}
+
+.card-body {
+  padding: 1.25rem;
+}
+
+/* 彈性布局 */
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+/* 間距 */
+.p-4 {
+  padding: 1rem;
+}
+
+.py-4 {
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.px-4 {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.my-2 {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.mb-4 {
+  margin-bottom: 1rem;
+}
+
+.mt-4 {
+  margin-top: 1rem;
+}
+
+/* 顏色 */
+.bg-white {
+  background-color: white;
+}
+
+.bg-gray-50 {
+  background-color: rgb(var(--neutral-50));
+}
+
+.bg-primary {
+  background-color: rgb(var(--primary-color));
+}
+
+.bg-primary-dark {
+  background-color: rgb(var(--primary-dark));
+}
+
+.bg-secondary {
+  background-color: rgb(var(--secondary-color));
+}
+
+.bg-accent {
+  background-color: rgb(var(--accent-color));
+}
+
+.bg-success {
+  background-color: rgb(var(--success-color));
+}
+
+.bg-warning {
+  background-color: rgb(var(--warning-color));
+}
+
+.bg-danger {
+  background-color: rgb(var(--danger-color));
+}
+
+.text-white {
+  color: white;
+}
+
+.text-primary {
+  color: rgb(var(--primary-color));
+}
+
+.text-secondary {
+  color: rgb(var(--secondary-color));
+}
+
+.text-success {
+  color: rgb(var(--success-color));
+}
+
+.text-warning {
+  color: rgb(var(--warning-color));
+}
+
+.text-danger {
+  color: rgb(var(--danger-color));
+}
+
+.text-gray-600 {
+  color: rgb(var(--neutral-600));
+}
+
+.text-gray-700 {
+  color: rgb(var(--neutral-700));
+}
+
+.text-gray-800 {
+  color: rgb(var(--neutral-800));
+}
+
+/* 陰影與圓角 */
+.rounded {
+  border-radius: 0.25rem;
+}
+
+.rounded-lg {
+  border-radius: 0.5rem;
+}
+
+.shadow-sm {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.shadow {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.shadow-md {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* 尺寸 */
+.min-h-screen {
+  min-height: 100vh;
+}
+
+/* 按鈕 */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  font-weight: 500;
+  border-radius: 0.25rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background-color: rgb(var(--primary-color));
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: rgb(var(--primary-dark));
+}
+
+.btn-secondary {
+  background-color: rgb(var(--secondary-color));
+  color: white;
+}
+
+.btn-success {
+  background-color: rgb(var(--success-color));
+  color: white;
+}
+
+.btn-warning {
+  background-color: rgb(var(--warning-color));
+  color: white;
+}
+
+.btn-danger {
+  background-color: rgb(var(--danger-color));
+  color: white;
+}
+
+/* 表單元素 */
+.form-input {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgb(var(--neutral-300));
+  border-radius: 0.25rem;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.form-input:focus {
+  border-color: rgb(var(--primary-color));
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(var(--primary-color), 0.25);
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: rgb(var(--neutral-700));
+}
+
+/* 應用特定樣式 */
+.appointment-card {
+  margin-bottom: 1rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.appointment-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.status-pending {
+  color: rgb(var(--warning-color));
+}
+
+.status-completed {
+  color: rgb(var(--success-color));
+}
+
+.status-cancelled {
+  color: rgb(var(--danger-color));
+}
+
+/* 動畫 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+/* 側邊欄 */
+.sidebar {
+  width: 250px;
+  background-color: white;
+  box-shadow: 1px 0 5px rgba(0, 0, 0, 0.05);
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 40;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1.5rem;
+  color: rgb(var(--neutral-700));
+  transition: background-color 0.2s ease;
+}
+
+.sidebar-item:hover {
+  background-color: rgb(var(--neutral-100));
+}
+
+.sidebar-item.active {
+  background-color: rgb(var(--primary-color), 0.1);
+  color: rgb(var(--primary-color));
+  border-left: 3px solid rgb(var(--primary-color));
+}
+
+.sidebar-item-icon {
+  margin-right: 0.75rem;
+}
+
+/* 主要內容區 */
+.main-content {
+  margin-left: 250px;
+  padding: 1.5rem;
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+  
+  .sidebar.open {
+    transform: translateX(0);
+  }
+  
+  .main-content {
+    margin-left: 0;
+    padding: 1rem;
+  }
+}
+
+/* Chrome 按鈕修正 */
+button {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  box-shadow: none;
+  -webkit-box-shadow: none;
+  outline: none;
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 修正 Safari 表格寬度 */
+table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+/* 確保內容不超出單元格 */
+td {
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* 自定義動畫效果 */
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* 應用動畫的工具類 */
+.animate-fade-in-down {
+  animation: fadeInDown 0.5s ease-out forwards;
+}
+
+.animate-pulse-once {
+  animation: pulse 1s ease-in-out;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.4s ease-out forwards;
+}
+
+/* 添加平滑過渡效果 */
+.transition-all {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 300ms;
+}
+
+/* 懸停效果 */
+.hover-scale {
+  transition: transform 0.2s ease;
+}
+
+.hover-scale:hover {
+  transform: scale(1.02);
+}
+
+/* 卡片陰影層次 */
+.shadow-depth-1 {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.shadow-depth-2 {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.shadow-depth-3 {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* 自定義日曆樣式 - 重新設計版本 */
+.custom-datepicker-calendar {
+  width: 100% !important;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  border: none;
+  box-shadow: none !important;
+}
+
+/* 今天日期樣式 - 紅色邊框 */
+.date-today {
+  border: 2px solid #ef4444 !important;
+  border-radius: 50%;
+}
+
+/* 選中日期樣式 - 主色背景和白色文字 */
+.react-datepicker__day--selected {
+  background-color: #8b5cf6 !important;
+  color: white !important;
+  font-weight: bold !important;
+  border-radius: 50% !important;
+}
+
+/* 懸停效果 */
+.react-datepicker__day:hover {
+  background-color: #ddd6fe !important;
+  cursor: pointer !important;
+  border-radius: 50% !important;
+}
+
+/* 月份名稱樣式 */
+.react-datepicker__current-month {
+  font-weight: 600 !important;
+  color: #4b5563 !important;
+}
+
+/* 週頭樣式 */
+.react-datepicker__day-name {
+  color: #6b7280 !important;
+  font-weight: 500 !important;
+  width: 2rem !important;
+  line-height: 2rem !important;
+  margin: 0 !important;
+  text-align: center !important;
+}
+
+/* 箭頭樣式 */
+.react-datepicker__navigation {
+  top: 12px !important;
+}
+
+.react-datepicker__navigation--previous {
+  left: 12px !important;
+}
+
+.react-datepicker__navigation--next {
+  right: 12px !important;
+}
+
+/* 整體日曆標頭區域樣式 */
+.react-datepicker__header {
+  background-color: #f9fafb !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  padding-top: 12px !important;
+  padding-bottom: 8px !important;
+}
+
+/* 日期數字樣式 */
+.react-datepicker__day {
+  margin: 0.2rem !important;
+  width: 2rem !important;
+  line-height: 2rem !important;
+  text-align: center !important;
+  transition: all 0.15s ease-in-out !important;
+}
+
+/* 設置日期月份選擇區塊 */
+.react-datepicker__month-container {
+  float: none !important;
+  width: 100% !important;
+}
+
+/* 星期頭容器樣式 - 確保對齊 */
+.react-datepicker__day-names {
+  display: flex !important;
+  justify-content: space-around !important;
+  padding: 0 0.5rem !important;
+}
+
+/* 日期行對齊 */
+.react-datepicker__week {
+  display: flex !important;
+  justify-content: space-around !important;
+}
+
+/* 使周末日期有不同顏色 */
+.react-datepicker__day--weekend:not(.react-datepicker__day--selected) {
+  color: #ef4444 !important;
+}
+
+/* 香港法定假期樣式 */
+.hk-holiday {
+  color: #ef4444 !important;
+  background-color: rgba(254, 226, 226, 0.4) !important;
+  position: relative !important;
+}
+
+/* 假期懸停提示 */
+.holiday-tooltip {
+  position: absolute !important;
+  top: -30px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  background-color: #4b5563 !important;
+  color: white !important;
+  padding: 4px 8px !important;
+  border-radius: 4px !important;
+  font-size: 12px !important;
+  white-space: nowrap !important;
+  z-index: 10 !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transition: opacity 0.2s, visibility 0.2s !important;
+  pointer-events: none !important;
+}
+
+.hk-holiday:hover .holiday-tooltip {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* 今天與選中日期同時存在的樣式優先級 */
+.react-datepicker__day--selected.date-today {
+  border-color: white !important;
+} 

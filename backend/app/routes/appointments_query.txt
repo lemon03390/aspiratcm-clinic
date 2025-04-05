@@ -1,0 +1,7 @@
+base_query = f"""
+SELECT a.id, a.patient_name, a.phone_number, d.name as doctor_name, 
+       a.appointment_time, a.status, a.next_appointment, 
+       a.related_appointment_id, a.consultation_type, a.created_at, a.updated_at
+FROM appointments a
+{join_type} JOIN doctors d ON a.doctor_id = d.id
+""" 
