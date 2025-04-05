@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, validator, EmailStr, constr
 import re
 import json
 from app.db import get_db
-from app.models.models import Patient, Doctor, Appointment
+from app.models import Patient, Doctor, Appointment
 from app.utils.time import now_hk
 
 router = APIRouter()

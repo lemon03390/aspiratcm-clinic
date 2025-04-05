@@ -1,5 +1,6 @@
 from app.db.database import engine
 from app.models.base import Base
+from app.models import *  # 確保所有模型被導入
 
 def init_db():
     Base.metadata.create_all(bind=engine)

@@ -1,28 +1,7 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum, ARRAY, JSON
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
-import enum
-
-Base = declarative_base()
-
-class AppointmentStatus(enum.Enum):
-    WAITING = "未應診"
-    VISITED = "已到診"
-    MISSING = "失蹤人口"
-    RESCHEDULED = "已改期"
-    FOLLOW_UP = "預約覆診"
-
-class Doctor(Base):
-    __tablename__ = "doctors"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, unique=True, index=True)
-    email = Column(String, index=True)
-    phone = Column(String)
-    schedule = Column(ARRAY(String), server_default='{}', nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+from app.models.base import Base
+from app.utils.time import now_hk
 
 class Appointment(Base):
     __tablename__ = "appointments"
@@ -39,8 +18,8 @@ class Appointment(Base):
     is_first_time = Column(Integer, default=0)  # 0: 非首次求診, 1: 首次求診
     is_troublesome = Column(Integer, default=0)  # 0: 非麻煩症患者, 1: 麻煩症患者  
     is_contagious = Column(Integer, default=0)  # 0: 非傳染病患者, 1: 傳染病患者
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: now_hk())
+    updated_at = Column(DateTime, default=lambda: now_hk(), onupdate=lambda: now_hk())
 
     doctor = relationship("Doctor", backref="appointments")
     related_appointment = relationship("Appointment", remote_side=[id], backref="follow_up_appointments") 

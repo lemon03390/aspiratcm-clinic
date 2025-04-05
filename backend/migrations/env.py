@@ -9,7 +9,9 @@ import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# 導入 Base 和 所有模型
 from app.models.base import Base
+from app.models import *  # 確保所有模型被導入
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
