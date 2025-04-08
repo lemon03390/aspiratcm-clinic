@@ -12,3 +12,4 @@ __pycache__
 
 # 但允許 docker 專用的這一個
 !.env.docker
+!frontend/.env.production

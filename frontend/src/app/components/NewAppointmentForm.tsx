@@ -50,7 +50,6 @@ export default function NewAppointmentForm({
   const [success, setSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 當醫師列表變化時更新預設醫師
   useEffect(() => {
     if (doctors.length > 0 && !appointmentData.doctor_name) {
       setAppointmentData((prev) => ({
@@ -60,7 +59,6 @@ export default function NewAppointmentForm({
     }
   }, [doctors]);
 
-  // 初始化時選擇子選項的預設值
   useEffect(() => {
     if (
       appointmentData.consultation_type.subTypes &&
@@ -76,7 +74,6 @@ export default function NewAppointmentForm({
     }
   }, [appointmentData.consultation_type.id]);
 
-  // 可選擇的小時和分鐘
   const hours = Array.from({ length: 12 }, (_, i) => i + 9).map((h) =>
     h.toString().padStart(2, "0"),
   );
@@ -84,11 +81,8 @@ export default function NewAppointmentForm({
     (i * 5).toString().padStart(2, "0"),
   );
 
-  // 設置最小日期為今天
   const today = new Date();
   const minDate = today.toISOString().split("T")[0];
-
-  // 設置最大日期為三個月後
   const maxDate = new Date(
     today.getFullYear(),
     today.getMonth() + 3,
@@ -111,28 +105,21 @@ export default function NewAppointmentForm({
     selectedDateTime.setHours(parseInt(hour, 10), parseInt(minute, 10), 0);
     const now = new Date();
 
-    // 檢查是否是過去的時間
     if (selectedDateTime < now) {
       setError("不能選擇過去的時間");
       return false;
     }
 
-    // 檢查醫師排班
     const selectedDoctor = doctors.find(
       (d) => d.name === appointmentData.doctor_name,
     );
     console.log('選中醫師:', selectedDoctor?.name, '排班:', selectedDoctor?.schedule);
-    
-    if (
-      selectedDoctor &&
-      selectedDoctor.schedule
-    ) {
+
+    if (selectedDoctor && selectedDoctor.schedule) {
       const dayOfWeek = selectedDateTime.getDay();
       console.log('選中日期星期:', dayOfWeek);
-      
-      // 使用排班格式轉換工具處理排班數據
+
       try {
-        // 檢查選擇的星期是否在醫師排班內
         if (!isDayInSchedule(selectedDoctor.schedule, dayOfWeek)) {
           const weekdayNames = ["日", "一", "二", "三", "四", "五", "六"];
           const errorMsg = `醫師星期${weekdayNames[dayOfWeek]}放緊假，麻煩約第二日`;
@@ -142,7 +129,6 @@ export default function NewAppointmentForm({
         }
       } catch (e) {
         console.error('排班驗證出錯:', e);
-        // 安全起見，如果出錯，假設醫師有排班
       }
     }
 
@@ -157,39 +143,29 @@ export default function NewAppointmentForm({
     setIsSubmitting(true);
 
     try {
-      // 驗證電話
       if (!validatePhoneNumber(appointmentData.phone_number)) {
         setError("聯絡電話必須至少包含8位數字");
         setIsSubmitting(false);
         return;
       }
 
-      // 驗證時間
-      if (
-        !selectedDate ||
-        !validateDateTime(selectedDate, selectedHour, selectedMinute)
-      ) {
+      if (!selectedDate || !validateDateTime(selectedDate, selectedHour, selectedMinute)) {
         setIsSubmitting(false);
         return;
       }
 
-      // 準備預約時間
       const appointmentTime = new Date(selectedDate);
       appointmentTime.setHours(
         parseInt(selectedHour, 10),
         parseInt(selectedMinute, 10),
         0,
       );
-      
-      // 確保使用標準 ISO 時間格式，避免時區問題
+
       const appointmentTimeISO = toISOString(appointmentTime);
-      
       console.log('正在創建預約，時間為:', appointmentTimeISO);
 
-      // 使用診療類型轉換工具格式化數據
       const consultationTypeObj = formatConsultationTypeForBackend(appointmentData.consultation_type as ExtendedConsultationType);
 
-      // 建立預約
       const response = await axios.post(
         getBackendUrl("/appointments"),
         {
@@ -212,7 +188,6 @@ export default function NewAppointmentForm({
 
       if (response.status >= 200 && response.status < 300) {
         setSuccess("預約已成功創建！");
-        // 重置表單
         setAppointmentData({
           patient_name: "",
           phone_number: "",
@@ -226,24 +201,29 @@ export default function NewAppointmentForm({
         setSelectedHour("10");
         setSelectedMinute("00");
 
-        // 通知父組件更新
         onAppointmentCreated();
       }
     } catch (err: any) {
-      // 使用全局錯誤處理工具
-      const errorInfo = ErrorHandler.handleApiError(err, '創建預約');
-      
-      // 設置錯誤信息
+      const errorInfo = ErrorHandler.handleApiError(err, "創建預約");
       setError(ErrorHandler.formatErrorForDisplay(errorInfo));
-      
-      // 添加詳細日誌
-      console.error('創建預約時發生錯誤:', errorInfo);
-      
-      // 針對特定錯誤類型顯示友好信息
-      if (errorInfo.statusCode === 422) {
-        console.table(errorInfo.fieldErrors || {});
-      } else if (errorInfo.isNetworkError) {
-        console.error('網絡錯誤，無法連接到服務器');
+      console.error("創建預約時發生錯誤:", errorInfo);
+
+      if (
+        errorInfo.statusCode === 422 &&
+        typeof errorInfo === "object" &&
+        "fieldErrors" in errorInfo &&
+        errorInfo.fieldErrors &&
+        typeof errorInfo.fieldErrors === "object"
+      ) {
+        console.table(errorInfo.fieldErrors);
+      }
+
+      if (
+        typeof errorInfo === "object" &&
+        "isNetworkError" in errorInfo &&
+        errorInfo.isNetworkError === true
+      ) {
+        console.error("網絡錯誤，無法連接到服務器");
       }
     } finally {
       setIsSubmitting(false);

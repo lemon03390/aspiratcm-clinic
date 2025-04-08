@@ -79,6 +79,7 @@ export interface ReferenceData {
   food_allergies: string[];
   data_sources: string[];
   regions: RegionsData;
+  doctors?: Doctor[];
 }
 
 // 地區資料類型
@@ -100,4 +101,11 @@ export interface ApiError {
   message: string;
   errors?: any[];
   debugInfo?: any;
+}
+
+// 醫師資料類型
+export interface Doctor {
+  id: number;
+  name: string;
+  specialty?: string;
 } 

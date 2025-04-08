@@ -1,20 +1,33 @@
+# 使用 Node 20 LTS 的穩定版本
 FROM node:20-bullseye
 
-# 設定工作資料夾
-WORKDIR /app/frontend
+# 設定工作目錄
+WORKDIR /app
 
-# 複製必要檔案先（讓 npm install 可快取）
+# ⬇️ 設定 ARG（build-time）與 ENV（build 和 run 都能讀）
+ARG NEXT_PUBLIC_API_BASE_URL
+ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
+
+# 複製 package.json 和 lock 檔案
 COPY frontend/package*.json ./
 
-# ✅ 安裝依賴並避免權限問題
+# 安裝依賴
 RUN npm install --unsafe-perm
 
-# 複製全部 frontend 資料夾內容
-COPY frontend/ .
+# ✅ 複製環境變數檔（一定要存在於 Git 或手動上傳）
+COPY frontend/.env.production .env.production
 
-# 設定 production mode 並 build
-ENV NODE_ENV=production
+# 複製整個前端應用
+COPY frontend/ ./
+
+# ✅ 印出實際環境變數值（debug）
+RUN cat .env.production
+
+# 執行編譯
 RUN npm run build
 
-# 啟動
+# 暴露 Next.js port（預設為 3000）
+EXPOSE 3000
+
+# 啟動應用
 CMD ["npm", "start"]

@@ -1,51 +1,44 @@
-import axios, { AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
+import axios, { AxiosError } from 'axios';
 
 /**
- * 從環境變數獲取後端API基本URL
- * 處理尾部斜線問題，確保返回的URL不包含尾部斜線
+ * 從環境變數獲取後端 API 基本 URL
+ * 僅部署環境：保證返回 /api/v1 開頭的相對路徑
  */
+
 export function getBackendUrl(path: string = ""): string {
-  // 從環境變數讀取API基本URL
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+  // 1. 獲取環境變數中的基礎路徑
+  const basePath = typeof window === "undefined"
+    ? process.env.API_BASE_URL // server-side (middleware / route handler)
+    : process.env.NEXT_PUBLIC_API_BASE_URL; // client-side
+
+  // 2. 檢查基礎路徑是否存在
+  if (!basePath) {
+    console.error("🔴 嚴重錯誤: 缺少基礎 API URL 環境變數");
+    throw new Error("❌ 無法取得 API base URL，請確認 .env.production 已設置 API_BASE_URL 與 NEXT_PUBLIC_API_BASE_URL。");
+  }
+
+  // 3. 合成最終 URL
+  let finalUrl = `${basePath}${path.startsWith("/") ? path : "/" + path}`;
   
-  if (!apiBaseUrl) {
-    console.warn("警告: NEXT_PUBLIC_API_BASE_URL 未設置");
-    const fallbackUrl = process.env.NODE_ENV === 'development' 
-      ? 'http://localhost:8000/api/v1' 
-      : '/api/v1';
-    console.log(`使用備用基礎URL: ${fallbackUrl}`);
-    return path ? `${fallbackUrl}${path.startsWith('/') ? path : `/${path}`}` : fallbackUrl;
+  // 4. 記錄環境和使用的 URL 類型
+  if (typeof window === "undefined") {
+    console.log("🧪 [Server] 使用 API_BASE_URL:", process.env.API_BASE_URL);
+  } else {
+    console.log("🧪 [Client] 使用 NEXT_PUBLIC_API_BASE_URL:", process.env.NEXT_PUBLIC_API_BASE_URL);
   }
   
-  // 處理尾部斜線，確保 URL 格式正確
-  const baseWithoutTrailingSlash = apiBaseUrl.endsWith('/')
-    ? apiBaseUrl.slice(0, -1)
-    : apiBaseUrl;
+  // 5. 檢查 URL 協議，確保使用 HTTPS
+  if (finalUrl.startsWith('http:')) {
+    console.warn('⚠️ 警告: 發現不安全的 HTTP URL:', finalUrl);
+    finalUrl = finalUrl.replace('http:', 'https:');
+    console.log('✅ 已修正為 HTTPS URL:', finalUrl);
+  }
   
-  // 處理路徑的前導斜線，確保正確連接
-  const pathWithLeadingSlash = path 
-    ? (path.startsWith('/') ? path : `/${path}`)
-    : "";
-  
-  const finalUrl = `${baseWithoutTrailingSlash}${pathWithLeadingSlash}`;
-  console.log("🔍 組合後的 API URL：", finalUrl);
-  
-  // 檢查 URL 格式
-  try {
-    new URL(finalUrl);
-  } catch (error) {
-    console.error("🚨 生成的 URL 格式無效:", finalUrl);
-    console.error("錯誤詳情:", error);
-    console.error("環境設置:", {
-      NODE_ENV: process.env.NODE_ENV,
-      NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL
-    });
-    // 返回一個可能有效的備用 URL
-    if (process.env.NODE_ENV === 'development') {
-      const backupUrl = `http://localhost:8000/api/v1${pathWithLeadingSlash}`;
-      console.log("使用備用 URL:", backupUrl);
-      return backupUrl;
-    }
+  // 6. 檢查是否缺少協議前綴
+  if (!finalUrl.startsWith('http') && !finalUrl.startsWith('/')) {
+    console.warn('⚠️ 警告: URL 缺少協議前綴:', finalUrl);
+    finalUrl = 'https://' + finalUrl;
+    console.log('✅ 已修正為完整 URL:', finalUrl);
   }
   
   return finalUrl;
@@ -55,76 +48,43 @@ export function getBackendUrl(path: string = ""): string {
  * 錯誤處理工具類，提供統一的錯誤處理邏輯
  */
 export class ErrorHandler {
-  /**
-   * 處理API請求錯誤，並返回結構化的錯誤對象
-   * @param error Axios錯誤對象
-   * @param context 額外的上下文信息，如操作名稱
-   * @returns 結構化的錯誤對象
-   */
-  static handleApiError(error: AxiosError, context: string = ''): { 
-    message: string; 
-    detail?: string; 
-    fieldErrors?: Record<string, string>;
-    statusCode?: number;
-    isNetworkError?: boolean;
-    isServerError?: boolean;
-    rawError?: any;
-  } {
-    // 記錄詳細的錯誤信息
+  static handleApiError(error: AxiosError, context: string = '') {
     console.error(`[API錯誤] 操作: ${context || '未指定操作'}`, error);
-    
-    // 處理請求被發送但服務器回應錯誤的情況
+
     if (error.response) {
       const statusCode = error.response.status;
       console.error(`[${statusCode}錯誤] URL: ${error.config?.url}`);
-      
-      // 處理422驗證錯誤
-      if (statusCode === 422) {
-        return ErrorHandler.handleValidationError(error, context);
-      }
-      
-      // 處理401認證錯誤
-      if (statusCode === 401) {
-        return {
-          message: '認證已過期或無效，請重新登入',
-          detail: '需要有效的認證才能繼續操作',
-          statusCode: 401,
-          isServerError: false
-        };
-      }
-      
-      // 處理404資源不存在錯誤
-      if (statusCode === 404) {
-        return {
-          message: '請求的資源不存在',
-          detail: `找不到指定的${context}資源`,
-          statusCode: 404,
-          isServerError: false
-        };
-      }
-      
-      // 處理服務器內部錯誤
-      if (statusCode >= 500) {
-        return {
-          message: '伺服器處理請求時出錯',
-          detail: (error.response.data as any)?.detail || '服務暫時不可用，請稍後再試',
-          statusCode: statusCode,
-          isServerError: true,
-          rawError: error.response.data
-        };
-      }
-      
-      // 處理其他HTTP錯誤
+
+      if (statusCode === 422) return ErrorHandler.handleValidationError(error, context);
+      if (statusCode === 401) return {
+        message: '認證已過期或無效，請重新登入',
+        detail: '需要有效的認證才能繼續操作',
+        statusCode: 401,
+        isServerError: false
+      };
+      if (statusCode === 404) return {
+        message: '請求的資源不存在',
+        detail: `找不到指定的${context}資源`,
+        statusCode: 404,
+        isServerError: false
+      };
+      if (statusCode >= 500) return {
+        message: '伺服器處理請求時出錯',
+        detail: (error.response.data as any)?.detail || '服務暫時不可用，請稍後再試',
+        statusCode,
+        isServerError: true,
+        rawError: error.response.data
+      };
+
       return {
         message: '請求處理失敗',
         detail: (error.response.data as any)?.detail || error.message,
-        statusCode: statusCode,
+        statusCode,
         isServerError: statusCode >= 500,
         rawError: error.response.data
       };
     }
-    
-    // 處理請求已發送但未收到回應的情況 (網絡錯誤)
+
     if (error.request) {
       console.error('[網絡錯誤] 未收到服務器回應:', error.request);
       return {
@@ -134,8 +94,7 @@ export class ErrorHandler {
         isServerError: false
       };
     }
-    
-    // 請求設置階段的錯誤
+
     console.error('[請求錯誤]', error.message);
     return {
       message: '無法完成請求',
@@ -143,43 +102,25 @@ export class ErrorHandler {
       isServerError: false
     };
   }
-  
-  /**
-   * 專門處理422驗證錯誤
-   * @param error Axios錯誤對象
-   * @param context 操作上下文
-   * @returns 結構化的錯誤對象，包含字段錯誤信息
-   */
-  static handleValidationError(error: AxiosError, context: string = ''): {
-    message: string;
-    detail: string;
-    fieldErrors: Record<string, string>;
-    statusCode: number;
-    isServerError: boolean;
-    rawError: any;
-  } {
+
+  static handleValidationError(error: AxiosError, context: string = '') {
     console.error('[驗證錯誤] 數據驗證失敗:', error.response?.data);
-    
     const validationErrors = (error.response?.data as any)?.detail || [];
     const fieldErrors: Record<string, string> = {};
-    
-    // 處理FastAPI返回的驗證錯誤格式
+
     if (Array.isArray(validationErrors)) {
       validationErrors.forEach((err: any) => {
         if (err.loc && Array.isArray(err.loc) && err.loc.length > 1) {
-          // 第一個元素通常是 'body'，我們要取第二個元素後的路徑
           const fieldPath = err.loc.slice(1).join('.');
           fieldErrors[fieldPath] = err.msg;
         }
       });
     }
-    
-    // 產生易讀的錯誤訊息
-    const fieldErrorCount = Object.keys(fieldErrors).length;
-    const detailMessage = fieldErrorCount > 0
-      ? `有 ${fieldErrorCount} 個欄位驗證失敗`
+
+    const detailMessage = Object.keys(fieldErrors).length > 0
+      ? `有 ${Object.keys(fieldErrors).length} 個欄位驗證失敗`
       : '資料格式不符合要求';
-    
+
     return {
       message: '提交的資料有誤，請檢查並修正',
       detail: detailMessage,
@@ -189,34 +130,20 @@ export class ErrorHandler {
       rawError: validationErrors
     };
   }
-  
-  /**
-   * 將錯誤信息格式化為易於顯示的字符串
-   * @param error 錯誤對象
-   * @returns 格式化的錯誤信息字符串
-   */
+
   static formatErrorForDisplay(error: any): string {
-    if (typeof error === 'string') {
-      return error;
-    }
-    
+    if (typeof error === 'string') return error;
+
     if (error.fieldErrors && Object.keys(error.fieldErrors).length > 0) {
-      // 對於字段錯誤，顯示具體的字段錯誤信息
       return Object.entries(error.fieldErrors)
         .map(([field, msg]) => `${this.formatFieldName(field)}: ${msg}`)
         .join('\n');
     }
-    
+
     return error.detail || error.message || '發生未知錯誤';
   }
-  
-  /**
-   * 將API的字段名格式化為更易讀的形式
-   * @param fieldName API字段名
-   * @returns 格式化後的字段名
-   */
+
   private static formatFieldName(fieldName: string): string {
-    // 欄位名稱中文化映射
     const fieldNameMap: Record<string, string> = {
       'patient_name': '患者姓名',
       'phone_number': '聯絡電話',
@@ -228,128 +155,74 @@ export class ErrorHandler {
       'is_troublesome': '麻煩症標記',
       'is_contagious': '傳染病標記'
     };
-    
-    // 如果有預設的中文名稱，直接返回
-    if (fieldNameMap[fieldName]) {
-      return fieldNameMap[fieldName];
-    }
-    
-    // 否則將欄位名轉為更易讀的格式
-    return fieldName
+
+    return fieldNameMap[fieldName] || fieldName
       .split('_')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
   }
 }
 
-// 創建統一的API客戶端
+// 創建 API 客戶端
 const apiClient = axios.create({
-  // 在瀏覽器端使用相對路徑，確保請求由Next.js代理
-  baseURL: typeof window !== 'undefined' 
-    ? '/api/v1' 
-    : getBackendUrl(),
+  baseURL: getBackendUrl(), // 統一使用部署相對路徑
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
-  timeout: 15000, // 15秒超時
+  timeout: 15000,
 });
 
-// 請求攔截器
-apiClient.interceptors.request.use(
-  (config) => {
-    // 可以在這裡添加認證令牌等
-    console.log(`[API請求] ${config.method?.toUpperCase()} ${config.url}`);
-    
-    // 記錄請求參數，方便排查問題
-    if (config.params) {
-      console.log(`[請求參數] ${JSON.stringify(config.params)}`);
+// 攔截器
+apiClient.interceptors.request.use((config) => {
+  console.log(`[API請求] ${config.method?.toUpperCase()} ${config.url}`);
+  if (config.params) console.log(`[請求參數] ${JSON.stringify(config.params)}`);
+  if (config.data && typeof config.data !== 'string') {
+    try {
+      console.log(`[請求數據] ${JSON.stringify(config.data)}`);
+    } catch {
+      console.log('[請求數據] 無法序列化');
     }
-    
-    if (config.data && typeof config.data !== 'string') {
-      try {
-        console.log(`[請求數據] ${JSON.stringify(config.data)}`);
-      } catch (e) {
-        console.log(`[請求數據] 無法序列化`);
-      }
-    }
-    
-    return config;
-  },
-  (error) => {
-    console.error('[API請求錯誤]', error);
-    return Promise.reject(error);
   }
-);
+  return config;
+}, (error) => {
+  console.error('[API請求錯誤]', error);
+  return Promise.reject(error);
+});
 
-// 響應攔截器
-apiClient.interceptors.response.use(
-  (response) => {
-    console.log(`[API響應] ${response.status} ${response.config.url}`);
-    return response;
-  },
-  (error) => {
-    if (error.response) {
-      console.error(`[API錯誤] ${error.response.status}`, error.response.data);
-      
-      // 根據URL和狀態碼生成有意義的錯誤日誌
-      const url = error.config?.url || '未知URL';
-      const method = error.config?.method?.toUpperCase() || 'UNKNOWN';
-      console.error(`[${method} ${url}] 請求失敗，狀態碼: ${error.response.status}`);
-      
-      if (error.response.status === 422) {
-        console.error('[驗證錯誤] 資料驗證失敗:', error.response.data);
-      }
-    } else if (error.request) {
-      console.error('[API錯誤] 沒有收到響應', error.request);
-    } else {
-      console.error('[API錯誤]', error.message);
-    }
-    return Promise.reject(error);
+apiClient.interceptors.response.use((response) => {
+  console.log(`[API響應] ${response.status} ${response.config.url}`);
+  return response;
+}, (error) => {
+  const status = error?.response?.status;
+  const url = error?.config?.url;
+  const method = error?.config?.method?.toUpperCase();
+  if (status) {
+    console.error(`[${method} ${url}] 錯誤 ${status}`, error.response.data);
+  } else {
+    console.error('[API錯誤]', error.message);
   }
-);
+  return Promise.reject(error);
+});
 
-// API請求函數
+// ✅ API 封裝
 export const api = {
-  // 預約相關
   appointments: {
-    // 獲取所有預約
     getAll: () => apiClient.get('/appointments'),
-    
-    // 通過電話查詢預約
-    getByPhone: (phone: string) => 
+    getByPhone: (phone: string) =>
       apiClient.get('/appointments/by-phone', { params: { phone_number: phone } }),
-    
-    // 通過ID獲取預約
     getById: (id: number) => apiClient.get(`/appointments/${id}`),
-    
-    // 創建新預約
     create: (data: any) => apiClient.post('/appointments', data),
-    
-    // 更新預約
     update: (id: number, data: any) => apiClient.put(`/appointments/${id}`, data),
-    
-    // 刪除預約
     delete: (id: number) => apiClient.delete(`/appointments/${id}`),
   },
-  
-  // 醫生相關
   doctors: {
-    // 獲取所有醫生
     getAll: () => apiClient.get('/doctors'),
-    
-    // 通過ID獲取醫生
     getById: (id: number) => apiClient.get(`/doctors/${id}`),
-    
-    // 創建新醫生
     create: (data: any) => apiClient.post('/doctors', data),
-    
-    // 更新醫生信息
     update: (id: number, data: any) => apiClient.put(`/doctors/${id}`, data),
-    
-    // 刪除醫生
     delete: (id: number) => apiClient.delete(`/doctors/${id}`),
-  },
+  }
 };
 
-export default apiClient; 
+export default apiClient;

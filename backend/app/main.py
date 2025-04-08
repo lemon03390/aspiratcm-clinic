@@ -19,79 +19,49 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def create_app() -> FastAPI:
-    """創建和配置FastAPI應用程序"""
-    try:
-        logger.info("創建FastAPI應用程序...")
-        
-        app = FastAPI(
-            title="診所預約系統 API",
-            description="用於管理診所預約和醫生的API",
-            version="1.0.0"
-        )
+    """創建和配置 FastAPI 應用"""
+    app = FastAPI(
+        title="診所預約系統 API",
+        description="用於管理診所預約和醫生的 API",
+        version="1.0.0"
+    )
 
-        # 配置 CORS
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=ALLOWED_ORIGINS,
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
+    # ✅ CORS 設定
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=ALLOWED_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
-        # 註冊預約路由
-        app.include_router(
-            appointments_router,
-            prefix="/api/v1/appointments",
-            tags=["appointments"]
-        )
+    # ✅ 路由註冊
+    app.include_router(appointments_router, prefix="/api/v1/appointments", tags=["appointments"])
+    app.include_router(doctors_router, prefix="/api/v1/doctors", tags=["doctors"])
+    app.include_router(appointment_detail_router, prefix="/api/v1/appointments", tags=["appointment-detail"])
+    app.include_router(patient_registration_router, prefix="/api/v1/patient_registration", tags=["patient-registration"])
 
-        app.include_router(
-            doctors_router,
-            prefix="/api/v1/doctors",
-            tags=["doctors"]
-        )
-        
-        # 註冊單個預約操作的路由
-        app.include_router(
-            appointment_detail_router,
-            prefix="/api/v1/appointments",
-            tags=["appointment-detail"]
-        )
-        
-        # 註冊患者登記路由
-        app.include_router(
-            patient_registration_router,
-            prefix="/api/v1/patient_registration",
-            tags=["patient-registration"]
-        )
+    @app.get("/")
+    async def root() -> Dict[str, str]:
+        return {"message": "歡迎使用診所預約系統 API"}
 
-        @app.get("/")
-        async def root() -> Dict[str, str]:
-            """API根路徑處理程序，返回歡迎訊息"""
-            return {"message": "歡迎使用診所預約系統 API"}
+    @app.get("/api/v1/health")
+    async def health_check() -> Dict[str, str]:
+        return {
+            "status": "healthy",
+            "version": "1.0.0",
+            "service": "clinic-api"
+        }
 
-        @app.get("/api/v1/health")
-        async def health_check() -> Dict[str, str]:
-            """健康檢查端點，用於監控系統運行狀態"""
-            return {
-                "status": "healthy",
-                "version": "1.0.0",
-                "service": "clinic-api"
-            }
+    @app.get("/debug/timezone")
+    def debug_timezone():
+        return {"hk_time": now_hk().isoformat()}
 
-        # 時區調試端點
-        @app.get("/debug/timezone")
-        def debug_timezone():
-            """返回當前香港時間，用於調試時區問題"""
-            return {"hk_time": now_hk().isoformat()}
+    return app
 
-        return app
-    except Exception as e:
-        logger.error(f"創建應用程序時發生錯誤: {e}")
-        return None
-
+# ✅ 給 Uvicorn 載入 app 使用
 app = create_app()
 
-if __name__ == "__main__" and (app := create_app()):
+if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, proxy_headers=True)

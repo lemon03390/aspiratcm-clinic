@@ -198,24 +198,24 @@ export default function ApiTestPage() {
           <div>
             <h3 className="font-medium mb-2">測試 GET /api/v1/appointments:</h3>
             <div className="bg-gray-800 text-green-400 p-3 rounded overflow-x-auto">
-              <code>curl -X GET http://localhost:3000/api/v1/appointments</code>
+              <code>curl -X GET /api/v1/appointments</code>
             </div>
           </div>
           
           <div>
             <h3 className="font-medium mb-2">測試 POST /api/v1/appointments:</h3>
             <div className="bg-gray-800 text-green-400 p-3 rounded overflow-x-auto">
-              <code>curl -X POST http://localhost:3000/api/v1/appointments \<br/>
-                -H "Content-Type: application/json" \<br/>
-                -d '{JSON.stringify(newAppointment)}'
-              </code>
+              <code dangerouslySetInnerHTML={{ __html: `curl -X POST /api/v1/appointments <br/>
+  -H "Content-Type: application/json" <br/>
+  -d '{"patient_name":"測試患者", "phone_number":"12345678", "appointment_time":"2023-04-01T10:00:00", "doctor_name":"陳醫師"}'
+` }} />
             </div>
           </div>
           
           <div>
             <h3 className="font-medium mb-2">直接測試後端 API:</h3>
             <div className="bg-gray-800 text-green-400 p-3 rounded overflow-x-auto">
-              <code>curl -X GET http://localhost:8000/api/v1/appointments</code>
+              <code>curl -X GET /api/v1/appointments</code>
             </div>
           </div>
         </div>

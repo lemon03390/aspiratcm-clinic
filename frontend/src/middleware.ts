@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getBackendUrl } from './libs/apiClient';
 
 // API路由前綴
 const API_ROUTE_PREFIX = '/api/v1';
-// FastAPI後端地址
-const BACKEND_API_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1';
+// 使用 getBackendUrl 函數獲取後端基礎 URL，確保 URL 格式統一
+const BACKEND_API_BASE = getBackendUrl();
 
 /**
  * 中間件函數，處理所有請求
@@ -34,6 +35,15 @@ export function middleware(request: NextRequest) {
     // 對於 POST /api/v1/appointments 特別記錄
     if (method === 'POST' && pathname === '/api/v1/appointments') {
       console.log('[Middleware] 捕獲到預約 POST 請求，應由 route.ts 處理');
+    }
+    
+    // 對於 patient_registration 路徑，檢查 URL 格式
+    if (pathname.includes('patient_registration')) {
+      console.log(`[Middleware] 患者登記請求: ${pathname}`);
+      // 檢查是否需要結尾斜線
+      if (!pathname.endsWith('/') && !request.nextUrl.search) {
+        console.log(`[Middleware] 患者登記路徑需要結尾斜線: ${pathname} => ${pathname}/`);
+      }
     }
     
     // 對於API路由，我們讓Next.js的API路由處理代理，無需在中間件中處理

@@ -1,32 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
+import { getBackendUrl } from '../../../../libs/apiClient';
 
 /**
  * 測試API端點，用於診斷前端API路由功能
  */
 export async function GET(req: NextRequest) {
-  const endpoint = req.nextUrl.searchParams.get('endpoint') || 'test';
-
   try {
-    if (!process.env.NEXT_PUBLIC_API_BASE_URL) {
-      throw new Error('❌ NEXT_PUBLIC_API_BASE_URL 未設置，請檢查環境變數');
-    }
-
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-    let backendUrl = apiBaseUrl;
-
-    if (backendUrl === '/api/v1') {
-      // 如果是相對路徑，替換為正式路徑
-      backendUrl = 'https://clinic.aspiratcm.com/api/v1';
-    }
-
+    const { searchParams } = new URL(req.url);
+    const endpoint = searchParams.get('endpoint');
+    
+    // 使用getBackendUrl函數獲取後端URL基礎地址
+    const backendUrl = getBackendUrl();
+    
+    // 收集環境配置信息
     const config = {
-      frontendApiPrefix: '/api/v1',
-      apiBaseUrl,
-      backendUrl,
-      process_env: {
-        NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
-      },
+      NODE_ENV: process.env.NODE_ENV,
+      NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
+      currentUrl: req.url,
       requestInfo: {
         url: req.url,
         method: req.method,
@@ -36,7 +27,8 @@ export async function GET(req: NextRequest) {
 
     if (endpoint === 'backend') {
       try {
-        const response = await axios.get(`${backendUrl}/docs`, {
+        // 使用getBackendUrl函數獲取文檔URL
+        const response = await axios.get(getBackendUrl('/docs/'), {
           timeout: 5000
         });
 

@@ -6,9 +6,13 @@ from datetime import datetime, date
 from pydantic import BaseModel, Field, validator, EmailStr, constr
 import re
 import json
+import logging
 from app.db import get_db
 from app.models import Patient, Doctor, Appointment
 from app.utils.time import now_hk
+
+# 設置日誌
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -78,12 +82,17 @@ class PatientBase(BaseModel):
     sub_district: str = Field(..., description="居住地區 - 細分地區")
     
     # 自定義驗證
+    @validator("email", pre=True)
+    def validate_email(cls, v):
+        # 特殊處理：接受 no@no.com 作為有效的電子郵件
+        return v
+        
     @validator("basic_diseases")
     def validate_basic_diseases(cls, v):
         if not v or len(v) == 0:
             raise ValueError("請至少選擇一項基礎疾病選項")
         for item in v:
-            if item not in BASIC_DISEASES and "其他，請列明" not in item:
+            if item not in BASIC_DISEASES and not item.startswith("其他，請列明:") and not item.startswith("其他:"):
                 raise ValueError(f"基礎疾病選項 '{item}' 無效")
         return v
     
@@ -92,7 +101,7 @@ class PatientBase(BaseModel):
         if not v or len(v) == 0:
             raise ValueError("請至少選擇一項藥物過敏選項")
         for item in v:
-            if item not in DRUG_ALLERGIES and "其他，請列明" not in item:
+            if item not in DRUG_ALLERGIES and not item.startswith("其他，請列明:") and not item.startswith("其他藥物:"):
                 raise ValueError(f"藥物過敏選項 '{item}' 無效")
         return v
     
@@ -101,7 +110,7 @@ class PatientBase(BaseModel):
         if not v or len(v) == 0:
             raise ValueError("請至少選擇一項食物過敏選項")
         for item in v:
-            if item not in FOOD_ALLERGIES and "其他，請列明" not in item:
+            if item not in FOOD_ALLERGIES and not item.startswith("其他，請列明:") and not item.startswith("其他食物:"):
                 raise ValueError(f"食物過敏選項 '{item}' 無效")
         return v
     
@@ -152,7 +161,7 @@ class PatientResponse(PatientBase):
     updated_at: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class PatientUpdate(BaseModel):
@@ -195,8 +204,19 @@ async def get_reference_data():
 # 檢查身份證/護照號碼是否已存在
 @router.get("/check-id-number")
 async def check_id_number(id_number: str, db: Session = Depends(get_db)):
-    patient = db.query(Patient).filter(Patient.id_number == id_number).first()
-    return {"exists": patient is not None, "patient": PatientResponse.from_orm(patient) if patient else None}
+    try:
+        # 格式化身份證號碼，移除特殊字符
+        formatted_id = re.sub(r'[\(\)]', '', id_number).strip()
+        
+        if patient := db.query(Patient).filter(Patient.id_number == formatted_id).first():
+            return {"exists": True, "patient": PatientResponse.model_validate(patient)}
+        return {"exists": False, "patient": None}
+    except Exception as e:
+        logger.error(f"檢查身份證號碼時出錯: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"處理身份證號碼查詢時出錯: {str(e)}"
+        )
 
 
 # 檢查患者是否存在（依據姓名和身份證號碼）
@@ -207,43 +227,55 @@ async def check_patient(
     phone_number: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    query = db.query(Patient)
-    
-    if chinese_name:
-        query = query.filter(Patient.chinese_name == chinese_name)
-    if id_number:
-        query = query.filter(Patient.id_number == id_number)
-    if phone_number:
-        query = query.filter(Patient.phone_number == phone_number)
-    
-    if not chinese_name and not id_number and not phone_number:
+    try:
+        if not any([chinese_name, id_number, phone_number]):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="請至少提供中文姓名、身份證號碼或聯絡電話中的一項"
+            )
+        
+        query = db.query(Patient)
+        
+        if chinese_name:
+            query = query.filter(Patient.chinese_name == chinese_name)
+        if id_number:
+            # 格式化身份證號碼
+            formatted_id = re.sub(r'[\(\)]', '', id_number).strip() if id_number else None
+            query = query.filter(Patient.id_number == formatted_id)
+        if phone_number:
+            # 格式化電話號碼
+            formatted_phone = re.sub(r'[\s\-\(\)]', '', phone_number) if phone_number else None
+            query = query.filter(Patient.phone_number == formatted_phone)
+        
+        if patient := query.first():
+            return {"exists": True, "patient": PatientResponse.model_validate(patient)}
+        return {"exists": False, "patient": None}
+    except HTTPException as he:
+        # 直接重新拋出HTTP異常
+        raise he
+    except Exception as e:
+        logger.error(f"檢查患者時出錯: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="請至少提供中文姓名、身份證號碼或聯絡電話中的一項"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"查詢患者資料時出錯: {str(e)}"
         )
-    
-    patient = query.first()
-    return {"exists": patient is not None, "patient": PatientResponse.from_orm(patient) if patient else None}
 
 
 # 創建新患者
 @router.post("/", response_model=PatientResponse, status_code=status.HTTP_201_CREATED)
 async def create_patient(patient: PatientCreate, db: Session = Depends(get_db)):
     # 檢查醫師是否存在
-    if patient.doctor_id:
-        doctor = db.query(Doctor).filter(Doctor.id == patient.doctor_id).first()
-        if not doctor:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"編號為 {patient.doctor_id} 的醫師不存在"
-            )
+    if patient.doctor_id and not (doctor := db.query(Doctor).filter(Doctor.id == patient.doctor_id).first()):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"編號為 {patient.doctor_id} 的醫師不存在"
+        )
     
     # 檢查身份證號碼是否已存在
-    existing_patient = db.query(Patient).filter(Patient.id_number == patient.id_number).first()
-    if existing_patient:
+    if db.query(Patient).filter(Patient.id_number == patient.id_number).first():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"具有此身份證號碼的患者已存在"
+            detail="具有此身份證號碼的患者已存在"
         )
     
     # 生成唯一掛號編號
@@ -295,15 +327,13 @@ async def get_patients(
     limit: int = 100,
     db: Session = Depends(get_db)
 ):
-    patients = db.query(Patient).offset(skip).limit(limit).all()
-    return patients
+    return db.query(Patient).offset(skip).limit(limit).all()
 
 
 # 獲取單個患者詳情
 @router.get("/{patient_id}", response_model=PatientResponse)
 async def get_patient(patient_id: int, db: Session = Depends(get_db)):
-    patient = db.query(Patient).filter(Patient.id == patient_id).first()
-    if not patient:
+    if not (patient := db.query(Patient).filter(Patient.id == patient_id).first()):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"編號為 {patient_id} 的患者不存在"
@@ -314,11 +344,24 @@ async def get_patient(patient_id: int, db: Session = Depends(get_db)):
 # 通過掛號編號獲取患者
 @router.get("/by-registration-number/{registration_number}", response_model=PatientResponse)
 async def get_patient_by_registration_number(registration_number: str, db: Session = Depends(get_db)):
-    patient = db.query(Patient).filter(Patient.registration_number == registration_number).first()
-    if not patient:
+    if not (patient := db.query(Patient).filter(Patient.registration_number == registration_number).first()):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"掛號編號為 {registration_number} 的患者不存在"
+        )
+    return patient
+
+
+# 通過電話號碼獲取患者
+@router.get("/by-phone-number/{phone_number}", response_model=PatientResponse)
+async def get_patient_by_phone_number(phone_number: str, db: Session = Depends(get_db)):
+    # 格式化電話號碼，移除特殊字符
+    formatted_phone = re.sub(r'[\s\-\(\)]', '', phone_number)
+    
+    if not (patient := db.query(Patient).filter(Patient.phone_number == formatted_phone).first()):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"電話號碼為 {phone_number} 的患者不存在"
         )
     return patient
 
@@ -330,8 +373,7 @@ async def update_patient(
     patient_update: PatientUpdate,
     db: Session = Depends(get_db)
 ):
-    db_patient = db.query(Patient).filter(Patient.id == patient_id).first()
-    if not db_patient:
+    if not (db_patient := db.query(Patient).filter(Patient.id == patient_id).first()):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"編號為 {patient_id} 的患者不存在"
@@ -339,8 +381,7 @@ async def update_patient(
     
     # 檢查醫師是否存在
     if patient_update.doctor_id is not None:
-        doctor = db.query(Doctor).filter(Doctor.id == patient_update.doctor_id).first()
-        if not doctor:
+        if not (doctor := db.query(Doctor).filter(Doctor.id == patient_update.doctor_id).first()):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"編號為 {patient_update.doctor_id} 的醫師不存在"
@@ -366,8 +407,7 @@ async def update_patient(
 # 刪除患者
 @router.delete("/{patient_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_patient(patient_id: int, db: Session = Depends(get_db)):
-    db_patient = db.query(Patient).filter(Patient.id == patient_id).first()
-    if not db_patient:
+    if not (db_patient := db.query(Patient).filter(Patient.id == patient_id).first()):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"編號為 {patient_id} 的患者不存在"

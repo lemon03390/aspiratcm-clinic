@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     const data = await req.json();
     
     // 使用統一函數獲取後端URL並添加路徑
-    const url = getBackendUrl('/appointments');
+    const url = getBackendUrl('/appointments/');
     
     console.log('代理POST請求到:', url);
     console.log('請求資料:', JSON.stringify(data, null, 2));
@@ -130,22 +130,8 @@ export async function GET(req: NextRequest) {
     });
     
     // 使用統一函數獲取後端URL並添加路徑
-    let url;
-    try {
-      url = getBackendUrl('/appointments');
-      console.log('代理GET請求到:', url);
-    } catch (error: any) {
-      console.error('生成後端URL時發生錯誤:', error.message);
-      console.error('環境設置:', {
-        NODE_ENV: process.env.NODE_ENV,
-        NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'undefined'
-      });
-      // 使用後備 URL
-      url = process.env.NODE_ENV === 'development' 
-        ? 'http://localhost:8000/api/v1/appointments'
-        : '/api/v1/appointments';
-      console.log('使用後備URL:', url);
-    }
+    const url = getBackendUrl('/appointments/');
+    console.log('代理GET請求到:', url);
     
     // 收集並記錄原始請求頭
     const headers: Record<string, string> = {};
