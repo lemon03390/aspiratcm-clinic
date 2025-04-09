@@ -58,6 +58,18 @@ const PatientForm: React.FC = () => {
   const [referenceData, setReferenceData] = useState<ReferenceData | null>(null);
   const [isInitialVisit, setIsInitialVisit] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [fieldsReadOnly, setFieldsReadOnly] = useState<boolean>(false);
+  const [successData, setSuccessData] = useState<{
+    chinese_name: string;
+    registration_number: string;
+    doctor_name: string;
+    registration_time: string;
+  } | null>(null);
+  
+  // 添加健康資訊顯示控制
+  const [hasBasicDisease, setHasBasicDisease] = useState<boolean>(false);
+  const [hasDrugAllergy, setHasDrugAllergy] = useState<boolean>(false);
+  const [hasFoodAllergy, setHasFoodAllergy] = useState<boolean>(false);
   
   // 添加其他描述輸入框狀態
   const [otherBasicDisease, setOtherBasicDisease] = useState<string>('');
@@ -75,6 +87,7 @@ const PatientForm: React.FC = () => {
     basic_diseases: ['我沒有任何基礎病'],
     drug_allergies: ['我沒有任何藥物過敏'],
     food_allergies: ['我沒有任何食物過敏'],
+    note: '', // 新增備註欄位
     has_appointment: false,
     doctor_id: undefined,
     data_source: '',
@@ -350,6 +363,7 @@ const PatientForm: React.FC = () => {
         basic_diseases: ['我沒有任何基礎病'],
         drug_allergies: ['我沒有任何藥物過敏'],
         food_allergies: ['我沒有任何食物過敏'],
+        note: '',
         has_appointment: false,
         doctor_id: undefined,
         data_source: '',
@@ -361,6 +375,12 @@ const PatientForm: React.FC = () => {
       setOtherDrugAllergy('');
       setOtherFoodAllergy('');
       setMessage(null);
+      // 重要：清除唯讀狀態
+      setFieldsReadOnly(false);
+      // 重設健康資訊狀態
+      setHasBasicDisease(false);
+      setHasDrugAllergy(false);
+      setHasFoodAllergy(false);
     } else {
       // 切換到覆診模式時清空搜索欄位
       setSearchQuery('');
@@ -368,6 +388,14 @@ const PatientForm: React.FC = () => {
         type: 'info',
         text: '請輸入身份證號碼或電話號碼查詢現有患者'
       });
+      
+      // 自動聚焦到搜索欄
+      setTimeout(() => {
+        const searchInput = document.getElementById('patient-search');
+        if (searchInput) {
+          searchInput.focus();
+        }
+      }, 100);
     }
   };
 
@@ -410,6 +438,7 @@ const PatientForm: React.FC = () => {
         basic_diseases: patient.basic_diseases,
         drug_allergies: patient.drug_allergies,
         food_allergies: patient.food_allergies,
+        note: patient.note || '',
         has_appointment: patient.has_appointment,
         doctor_id: patient.doctor_id,
         data_source: patient.data_source,
@@ -422,6 +451,14 @@ const PatientForm: React.FC = () => {
       processOtherItems(patient.basic_diseases, 'basic_diseases');
       processOtherItems(patient.drug_allergies, 'drug_allergies');
       processOtherItems(patient.food_allergies, 'food_allergies');
+      
+      // 設置健康資訊狀態
+      setHasBasicDisease(!patient.basic_diseases.some(d => d.includes('我沒有')));
+      setHasDrugAllergy(!patient.drug_allergies.some(d => d.includes('我沒有')));
+      setHasFoodAllergy(!patient.food_allergies.some(d => d.includes('我沒有')));
+
+      // 設置欄位為唯讀，但主診醫師可選
+      setFieldsReadOnly(true);
 
       setMessage({
         type: 'success',
@@ -438,6 +475,15 @@ const PatientForm: React.FC = () => {
     }
   };
   
+  // 允許重新編輯覆診患者資料
+  const handleEditFields = () => {
+    setFieldsReadOnly(false);
+    setMessage({
+      type: 'info',
+      text: '您現在可以編輯患者資料'
+    });
+  };
+
   // 從現有數據中提取「其他，請列明」的內容
   const processOtherItems = (items: string[], field: 'basic_diseases' | 'drug_allergies' | 'food_allergies') => {
     // 檢查不同格式的「其他」選項
@@ -508,6 +554,7 @@ const PatientForm: React.FC = () => {
     e.preventDefault();
     setIsLoading(true);
     setMessage(null);
+    setSuccessData(null); // 重置成功數據
 
     try {
       // 初診和覆診都需要選擇醫師
@@ -655,29 +702,29 @@ const PatientForm: React.FC = () => {
       const response = await createPatient(processedData);
       
       console.log('✅ 患者創建成功:', response);
+      
+      // 保存成功的數據，用於顯示成功卡片
+      const doctorName = referenceData?.doctors?.find(d => d.id === formData.doctor_id)?.name || '未知醫師';
+      setSuccessData({
+        chinese_name: formData.chinese_name,
+        registration_number: response.registration_number,
+        doctor_name: doctorName,
+        registration_time: new Date().toLocaleString('zh-TW', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      });
+      
       setMessage({
         type: 'success',
         text: `患者登記成功！掛號編號: ${response.registration_number}`
       });
       
-      // 重置表單
-      setFormData({
-        chinese_name: '',
-        english_name: '',
-        id_number: '',
-        birth_date: '',
-        phone_number: '',
-        email: 'no@no.com', // 設置為 no@no.com 而非空字串
-        basic_diseases: ['我沒有任何基礎病'],
-        drug_allergies: ['我沒有任何藥物過敏'],
-        food_allergies: ['我沒有任何食物過敏'],
-        has_appointment: false,
-        doctor_id: undefined,
-        data_source: '',
-        region: '',
-        district: '',
-        sub_district: '',
-      });
+      // 清空基本表單狀態
+      setFieldsReadOnly(false);
       setOtherBasicDisease('');
       setOtherDrugAllergy('');
       setOtherFoodAllergy('');
@@ -748,7 +795,7 @@ const PatientForm: React.FC = () => {
         // 未知錯誤
         setMessage({
           type: 'error',
-          text: error.message || '患者登記失敗，請稍後再試'
+          text: `錯誤: ${error.message || '提交表單時發生未知錯誤'}`
         });
       }
     } finally {
@@ -831,527 +878,691 @@ const PatientForm: React.FC = () => {
     }
   }, [referenceData]);
 
+  // 處理健康資訊選擇
+  const handleHealthOptionChange = (
+    field: 'basic_diseases' | 'drug_allergies' | 'food_allergies',
+    hasCondition: boolean
+  ) => {
+    if (field === 'basic_diseases') {
+      setHasBasicDisease(hasCondition);
+      if (!hasCondition) {
+        // 重置為無疾病
+        setFormData(prev => ({
+          ...prev,
+          basic_diseases: ['我沒有任何基礎病']
+        }));
+        setOtherBasicDisease('');
+      } else {
+        // 設置為空，等待用戶選擇
+        setFormData(prev => ({
+          ...prev,
+          basic_diseases: []
+        }));
+      }
+    } else if (field === 'drug_allergies') {
+      setHasDrugAllergy(hasCondition);
+      if (!hasCondition) {
+        // 重置為無過敏
+        setFormData(prev => ({
+          ...prev,
+          drug_allergies: ['我沒有任何藥物過敏']
+        }));
+        setOtherDrugAllergy('');
+      } else {
+        // 設置為空，等待用戶選擇
+        setFormData(prev => ({
+          ...prev,
+          drug_allergies: []
+        }));
+      }
+    } else if (field === 'food_allergies') {
+      setHasFoodAllergy(hasCondition);
+      if (!hasCondition) {
+        // 重置為無過敏
+        setFormData(prev => ({
+          ...prev,
+          food_allergies: ['我沒有任何食物過敏']
+        }));
+        setOtherFoodAllergy('');
+      } else {
+        // 設置為空，等待用戶選擇
+        setFormData(prev => ({
+          ...prev,
+          food_allergies: []
+        }));
+      }
+    }
+  };
+
+  // 顯示成功卡片
+  const renderSuccessCard = () => {
+    if (!successData) {
+      return null;
+    }
+    
+    return (
+      <div className="bg-white shadow-md rounded-lg p-6 mb-6 border-2 border-green-500">
+        <div className="flex items-center mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-500 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <h2 className="text-2xl font-bold text-gray-800">掛號成功</h2>
+        </div>
+        
+        <div className="mb-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-gray-500">患者姓名</p>
+              <p className="text-lg font-medium">{successData.chinese_name}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">掛號編號</p>
+              <p className="text-lg font-medium">{successData.registration_number}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">主診醫師</p>
+              <p className="text-lg font-medium">{successData.doctor_name}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">登記時間</p>
+              <p className="text-lg font-medium">{successData.registration_time}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex flex-wrap gap-3 mt-6">
+          <button
+            type="button"
+            onClick={() => {
+              setFormData({
+                chinese_name: '',
+                english_name: '',
+                id_number: '',
+                birth_date: '',
+                phone_number: '',
+                email: 'no@no.com',
+                basic_diseases: ['我沒有任何基礎病'],
+                drug_allergies: ['我沒有任何藥物過敏'],
+                food_allergies: ['我沒有任何食物過敏'],
+                note: '',
+                has_appointment: false,
+                doctor_id: undefined,
+                data_source: '',
+                region: '',
+                district: '',
+                sub_district: '',
+              });
+              setHasBasicDisease(false);
+              setHasDrugAllergy(false);
+              setHasFoodAllergy(false);
+              setSuccessData(null);
+            }}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
+            </svg>
+            再登記一位病人
+          </button>
+          
+          <button
+            type="button"
+            onClick={() => router.push('/')}
+            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 flex items-center"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+            </svg>
+            返回首頁
+          </button>
+          
+          <button
+            type="button"
+            onClick={() => {
+              if (successData.registration_number) {
+                router.push(`/patients/${successData.registration_number}`);
+              } else {
+                setMessage({
+                  type: 'error',
+                  text: '無法查看患者詳情：掛號編號不存在'
+                });
+              }
+            }}
+            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+              <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+            </svg>
+            查看患者詳情
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   if (!referenceData) {
-    return <div className="p-4 text-center">加載中...</div>;
+    return (
+      <div className="p-6 bg-white rounded-lg shadow-md">
+        <div className="flex items-center justify-center h-40">
+          <div className="animate-pulse flex flex-col items-center">
+            <div className="h-12 w-12 rounded-full bg-blue-200 mb-4"></div>
+            <div className="h-4 w-48 bg-blue-200 rounded mb-2"></div>
+            <div className="h-3 w-32 bg-blue-100 rounded"></div>
+          </div>
+        </div>
+        <p className="text-center text-gray-500 mt-4">載入中，請稍候...</p>
+      </div>
+    );
   }
 
   return (
-    <ErrorBoundary fallback={<div className="p-4 text-center">加載中...</div>}>
-      <div className="max-w-4xl mx-auto p-4 bg-white rounded-lg shadow">
-        <h2 className="text-2xl font-bold mb-6 text-center">患者登記表</h2>
-        
-        {/* 狀態消息 */}
-        {message && (
-          <div className={`p-4 mb-4 flex items-start rounded-md ${
-            message.type === 'success' 
-              ? 'bg-green-50 text-green-800 border border-green-200' 
-              : message.type === 'error' 
-                ? 'bg-red-50 text-red-800 border border-red-200' 
-                : 'bg-yellow-50 text-yellow-800 border border-yellow-200'
-          }`}>
-            <div className="mr-3 mt-0.5">
-              {message.type === 'success' && (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-              )}
-              {message.type === 'error' && (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-              )}
-              {message.type === 'info' && (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-500" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zm-1 9a1 1 0 01-1-1v-4a1 1 0 112 0v4a1 1 0 01-1 1z" clipRule="evenodd" />
-                </svg>
-              )}
+    <ErrorBoundary>
+      <div className="bg-white shadow-md rounded-lg p-6">
+        {/* 顯示成功卡片 */}
+        {successData ? (
+          renderSuccessCard()
+        ) : (
+          <form onSubmit={handleSubmit}>
+            {message && (
+              <div className={`mb-4 p-3 rounded-md ${
+                message.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 
+                message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 
+                'bg-blue-50 text-blue-700 border border-blue-200'
+              }`}>
+                <p className="whitespace-pre-line">{message.text}</p>
+              </div>
+            )}
+            
+            {/* 初診/複診切換 */}
+            <div className="flex justify-between items-center mb-6">
+              <div className="text-lg font-bold">患者登記表</div>
+              <div className="flex space-x-2">
+                <button
+                  type="button"
+                  className={`px-4 py-2 rounded-md ${
+                    isInitialVisit 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                  onClick={() => handleVisitTypeChange(true)}
+                >
+                  初診
+                </button>
+                <button
+                  type="button"
+                  className={`px-4 py-2 rounded-md ${
+                    isInitialVisit 
+                    ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    : 'bg-blue-600 text-white'
+                  }`}
+                  onClick={() => handleVisitTypeChange(false)}
+                >
+                  複診
+                </button>
+              </div>
             </div>
-            <div className="flex-1 whitespace-pre-wrap">
-              {message.text}
+            
+            {/* 複診搜尋 */}
+            {!isInitialVisit && (
+              <div className="mb-6 p-4 bg-blue-50 rounded-md border border-blue-200">
+                <div className="text-blue-700 mb-2">覆診病人需先輸入身份證或電話搜尋現有紀錄</div>
+                <div className="flex gap-2">
+                  <input
+                    id="patient-search"
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="輸入身份證號碼或電話號碼"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={handlePatientSearch}
+                    disabled={isLoading}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-300"
+                  >
+                    {isLoading ? '搜尋中...' : '搜尋'}
+                  </button>
+                </div>
+              </div>
+            )}
+            
+            {/* 覆診資料編輯控制 */}
+            {!isInitialVisit && fieldsReadOnly && (
+              <div className="mb-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleEditFields}
+                  className="px-3 py-1 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 flex items-center text-sm"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                  </svg>
+                  重新編輯
+                </button>
+              </div>
+            )}
+            
+            <h2 className="text-xl font-bold mb-4">基本資料</h2>
+            
+            {/* 基本資料區塊 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              {/* 姓名欄位 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  中文姓名 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="chinese_name"
+                  value={formData.chinese_name}
+                  onChange={handleInputChange}
+                  readOnly={fieldsReadOnly}
+                  className={`mt-1 block w-full px-3 py-2 border ${fieldsReadOnly ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  英文姓名 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="english_name"
+                  value={formData.english_name}
+                  onChange={handleInputChange}
+                  readOnly={fieldsReadOnly}
+                  className={`mt-1 block w-full px-3 py-2 border ${fieldsReadOnly ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  身份證號碼 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="id_number"
+                  value={formData.id_number}
+                  onChange={handleInputChange}
+                  readOnly={fieldsReadOnly}
+                  className={`mt-1 block w-full px-3 py-2 border ${fieldsReadOnly ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  出生日期 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  name="birth_date"
+                  value={formData.birth_date}
+                  onChange={handleInputChange}
+                  readOnly={fieldsReadOnly}
+                  className={`mt-1 block w-full px-3 py-2 border ${fieldsReadOnly ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  手機號碼 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  name="phone_number"
+                  value={formData.phone_number}
+                  onChange={handleInputChange}
+                  readOnly={fieldsReadOnly}
+                  className={`mt-1 block w-full px-3 py-2 border ${fieldsReadOnly ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  電子郵件 (選填)
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email === 'no@no.com' ? '' : formData.email}
+                  onChange={handleInputChange}
+                  readOnly={fieldsReadOnly}
+                  className={`mt-1 block w-full px-3 py-2 border ${fieldsReadOnly ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+                  placeholder="輸入電子郵件或留空"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  從何得知本診所 <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="data_source"
+                  value={formData.data_source}
+                  onChange={handleInputChange}
+                  disabled={fieldsReadOnly}
+                  className={`mt-1 block w-full px-3 py-2 border ${fieldsReadOnly ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+                  required
+                >
+                  <option value="">請選擇</option>
+                  {referenceData.data_sources.map((source) => (
+                    <option key={source} value={source}>
+                      {source}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-          </div>
-        )}
-        
-        <div className="mb-4">
-          <label className="inline-flex items-center mr-6">
-            <input
-              type="radio"
-              name="visit_type"
-              checked={isInitialVisit}
-              onChange={() => handleVisitTypeChange(true)}
-              className="form-radio h-5 w-5 text-blue-600"
-            />
-            <span className="ml-2 text-gray-700">初診</span>
-          </label>
-          <label className="inline-flex items-center">
-            <input
-              type="radio"
-              name="visit_type"
-              checked={!isInitialVisit}
-              onChange={() => handleVisitTypeChange(false)}
-              className="form-radio h-5 w-5 text-blue-600"
-            />
-            <span className="ml-2 text-gray-700">覆診</span>
-          </label>
-        </div>
-        
-        {!isInitialVisit && (
-          <div className="mb-4 p-4 bg-yellow-50 rounded-md border border-yellow-200">
-            <p className="text-yellow-800 mb-2 flex items-center">
-              <svg className="h-5 w-5 mr-2 text-yellow-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zm-1 9a1 1 0 01-1-1v-4a1 1 0 112 0v4a1 1 0 01-1 1z" clipRule="evenodd" />
-              </svg>
-              請輸入患者的身份證號碼或電話號碼查詢現有記錄。
-            </p>
-            <div className="flex space-x-4">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="輸入身份證號碼或電話號碼"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              />
-              <button
-                type="button"
-                onClick={handlePatientSearch}
-                disabled={isLoading}
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                {isLoading ? '搜尋中...' : '搜尋'}
-              </button>
-            </div>
-          </div>
-        )}
-        
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* 基本信息 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="chinese_name" className="block text-sm font-medium text-gray-700 mb-1">
-                中文姓名 <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                id="chinese_name"
-                name="chinese_name"
-                value={formData.chinese_name}
-                onChange={handleInputChange}
-                className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            
+            <h2 className="text-xl font-bold mb-4">居住地區</h2>
+            
+            {/* 區域選擇器 */}
+            <div className="mb-6">
+              <RegionSelector
+                regions={referenceData.regions}
+                onChange={handleRegionChange}
+                value={{
+                  region: formData.region,
+                  district: formData.district,
+                  subDistrict: formData.sub_district
+                }}
                 required
-                disabled={!isInitialVisit && Boolean(formData.id_number)}
-                autoComplete="name"
+                readOnly={fieldsReadOnly}
               />
             </div>
-            <div>
-              <label htmlFor="english_name" className="block text-sm font-medium text-gray-700 mb-1">
-                英文姓名 <span className="text-red-500">*</span>
+            
+            <h2 className="text-xl font-bold mb-4">健康資訊</h2>
+            
+            {/* 健康資訊區塊 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              {/* 健康資訊選擇 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  是否有基礎疾病 <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="has_basic_disease"
+                  value={hasBasicDisease ? '是' : '否'}
+                  onChange={(e) => {
+                    const value = e.target.value === '是';
+                    setHasBasicDisease(value);
+                    if (!value) {
+                      setFormData(prev => ({
+                        ...prev,
+                        basic_diseases: ['我沒有任何基礎病']
+                      }));
+                      setOtherBasicDisease('');
+                    }
+                  }}
+                  disabled={fieldsReadOnly}
+                  className={`mt-1 block w-full px-3 py-2 border ${fieldsReadOnly ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+                  required
+                >
+                  <option value="">請選擇</option>
+                  <option value="是">是</option>
+                  <option value="否">否</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  是否有藥物過敏 <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="has_drug_allergy"
+                  value={hasDrugAllergy ? '是' : '否'}
+                  onChange={(e) => {
+                    const value = e.target.value === '是';
+                    setHasDrugAllergy(value);
+                    if (!value) {
+                      setFormData(prev => ({
+                        ...prev,
+                        drug_allergies: ['我沒有任何藥物過敏']
+                      }));
+                      setOtherDrugAllergy('');
+                    }
+                  }}
+                  disabled={fieldsReadOnly}
+                  className={`mt-1 block w-full px-3 py-2 border ${fieldsReadOnly ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+                  required
+                >
+                  <option value="">請選擇</option>
+                  <option value="是">是</option>
+                  <option value="否">否</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  是否有食物過敏 <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="has_food_allergy"
+                  value={hasFoodAllergy ? '是' : '否'}
+                  onChange={(e) => {
+                    const value = e.target.value === '是';
+                    setHasFoodAllergy(value);
+                    if (!value) {
+                      setFormData(prev => ({
+                        ...prev,
+                        food_allergies: ['我沒有任何食物過敏']
+                      }));
+                      setOtherFoodAllergy('');
+                    }
+                  }}
+                  disabled={fieldsReadOnly}
+                  className={`mt-1 block w-full px-3 py-2 border ${fieldsReadOnly ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+                  required
+                >
+                  <option value="">請選擇</option>
+                  <option value="是">是</option>
+                  <option value="否">否</option>
+                </select>
+              </div>
+            </div>
+            
+            {/* 基礎疾病詳細選項 */}
+            {hasBasicDisease && (
+              <div className="mb-6 p-4 bg-gray-50 rounded-md border border-gray-200">
+                <div className="mb-2 font-medium">請選擇基礎疾病（可多選）</div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
+                  {referenceData.basic_diseases
+                    .filter(disease => !disease.includes('我沒有'))
+                    .map((disease, idx) => (
+                    <label key={`basic_disease_${idx}`} className="inline-flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={formData.basic_diseases.includes(disease)}
+                        onChange={(e) => handleCheckboxChange('basic_diseases', disease, e.target.checked)}
+                        disabled={fieldsReadOnly}
+                        className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">{disease}</span>
+                    </label>
+                  ))}
+                </div>
+                
+                {/* 其他基礎疾病輸入框 */}
+                {formData.basic_diseases.includes('其他，請列明') && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      其他基礎疾病，請列明
+                    </label>
+                    <input
+                      type="text"
+                      value={otherBasicDisease}
+                      onChange={(e) => handleOtherInputChange('basic_diseases', e.target.value)}
+                      disabled={fieldsReadOnly}
+                      className={`mt-1 block w-full px-3 py-2 border ${fieldsReadOnly ? 'bg-gray-100' : 'bg-gray-50'} border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+                      placeholder="請詳細說明其他基礎疾病"
+                    />
+                    {formData.basic_diseases.includes('其他，請列明') && !otherBasicDisease && (
+                      <p className="text-sm text-red-600 mt-1">請填寫基礎疾病細節</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* 藥物過敏詳細選項 */}
+            {hasDrugAllergy && (
+              <div className="mb-6 p-4 bg-gray-50 rounded-md border border-gray-200">
+                <div className="mb-2 font-medium">請選擇藥物過敏（可多選）</div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
+                  {referenceData.drug_allergies
+                    .filter(allergy => !allergy.includes('我沒有'))
+                    .map((allergy, idx) => (
+                    <label key={`drug_allergy_${idx}`} className="inline-flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={formData.drug_allergies.includes(allergy)}
+                        onChange={(e) => handleCheckboxChange('drug_allergies', allergy, e.target.checked)}
+                        disabled={fieldsReadOnly}
+                        className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">{allergy}</span>
+                    </label>
+                  ))}
+                </div>
+                
+                {/* 其他藥物過敏輸入框 */}
+                {formData.drug_allergies.includes('其他，請列明') && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      其他藥物過敏，請列明
+                    </label>
+                    <input
+                      type="text"
+                      value={otherDrugAllergy}
+                      onChange={(e) => handleOtherInputChange('drug_allergies', e.target.value)}
+                      disabled={fieldsReadOnly}
+                      className={`mt-1 block w-full px-3 py-2 border ${fieldsReadOnly ? 'bg-gray-100' : 'bg-gray-50'} border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+                      placeholder="請詳細說明其他藥物過敏"
+                    />
+                    {formData.drug_allergies.includes('其他，請列明') && !otherDrugAllergy && (
+                      <p className="text-sm text-red-600 mt-1">請填寫藥物過敏細節</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* 食物過敏詳細選項 */}
+            {hasFoodAllergy && (
+              <div className="mb-6 p-4 bg-gray-50 rounded-md border border-gray-200">
+                <div className="mb-2 font-medium">請選擇食物過敏（可多選）</div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
+                  {referenceData.food_allergies
+                    .filter(allergy => !allergy.includes('我沒有'))
+                    .map((allergy, idx) => (
+                    <label key={`food_allergy_${idx}`} className="inline-flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={formData.food_allergies.includes(allergy)}
+                        onChange={(e) => handleCheckboxChange('food_allergies', allergy, e.target.checked)}
+                        disabled={fieldsReadOnly}
+                        className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">{allergy}</span>
+                    </label>
+                  ))}
+                </div>
+                
+                {/* 其他食物過敏輸入框 */}
+                {formData.food_allergies.includes('其他，請列明') && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      其他食物過敏，請列明
+                    </label>
+                    <input
+                      type="text"
+                      value={otherFoodAllergy}
+                      onChange={(e) => handleOtherInputChange('food_allergies', e.target.value)}
+                      disabled={fieldsReadOnly}
+                      className={`mt-1 block w-full px-3 py-2 border ${fieldsReadOnly ? 'bg-gray-100' : 'bg-gray-50'} border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+                      placeholder="請詳細說明其他食物過敏"
+                    />
+                    {formData.food_allergies.includes('其他，請列明') && !otherFoodAllergy && (
+                      <p className="text-sm text-red-600 mt-1">請填寫食物過敏細節</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* 備註欄位 */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                備註（選填）
               </label>
-              <input
-                type="text"
-                id="english_name"
-                name="english_name"
-                value={formData.english_name}
+              <textarea
+                name="note"
+                value={formData.note}
                 onChange={handleInputChange}
-                className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                required
-                disabled={!isInitialVisit && Boolean(formData.id_number)}
-                autoComplete="name"
+                disabled={fieldsReadOnly}
+                rows={3}
+                className={`mt-1 block w-full px-3 py-2 border ${fieldsReadOnly ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+                placeholder="例如：偏好女醫師，懂英語，請準備輪椅"
               />
             </div>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="id_number" className="block text-sm font-medium text-gray-700 mb-1">
-                身份證/護照號碼 <span className="text-red-500">*</span>
+            
+            {/* 診所資訊 */}
+            <h2 className="text-xl font-bold mb-4">診所資訊</h2>
+            
+            {/* 醫師選擇 */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                主診醫師 <span className="text-red-500">*</span>
               </label>
-              <input
-                type="text"
-                id="id_number"
-                name="id_number"
-                value={formData.id_number}
-                onChange={handleInputChange}
-                className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                required
-                disabled={!isInitialVisit && Boolean(formData.id_number)}
-                autoComplete="off"
-              />
-            </div>
-            <div>
-              <label htmlFor="birth_date" className="block text-sm font-medium text-gray-700 mb-1">
-                出生日期 <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                id="birth_date"
-                name="birth_date"
-                value={formData.birth_date}
-                onChange={handleInputChange}
-                className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                required
-                disabled={!isInitialVisit && Boolean(formData.id_number)}
-                autoComplete="bday"
-              />
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="phone_number" className="block text-sm font-medium text-gray-700 mb-1">
-                聯絡電話 <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="tel"
-                id="phone_number"
-                name="phone_number"
-                value={formData.phone_number}
-                onChange={handleInputChange}
-                className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                required
-                autoComplete="tel"
-              />
-            </div>
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                電郵地址
-              </label>
-              <input
-                type="email"
-                id="email"
-                name="email"
-                value={formData.email === 'no@no.com' ? '' : formData.email || ''}
+              <select
+                name="doctor_id"
+                value={formData.doctor_id?.toString() || ''}
                 onChange={(e) => {
-                  // 不接受 no@no.com，若用戶嘗試輸入，轉為空字串
-                  const newValue = e.target.value === 'no@no.com' ? '' : e.target.value;
+                  const value = e.target.value ? parseInt(e.target.value, 10) : undefined;
                   setFormData(prev => ({
                     ...prev,
-                    email: newValue
+                    doctor_id: value
                   }));
                 }}
-                onFocus={(e) => {
-                  // 獲得焦點時，如果是 no@no.com，清空顯示
-                  if (formData.email === 'no@no.com') {
-                    setFormData(prev => ({
-                      ...prev,
-                      email: ''
-                    }));
-                  }
-                }}
-                onBlur={(e) => {
-                  // 失去焦點時，如果欄位為空，設置為 no@no.com
-                  if (!e.target.value.trim()) {
-                    console.log("Email 輸入框失去焦點，欄位為空，設置為 no@no.com");
-                    setFormData(prev => ({
-                      ...prev,
-                      email: 'no@no.com'
-                    }));
-                  }
-                }}
-                className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                autoComplete="email"
-                placeholder="選填項目，如留空將自動填入 no@no.com"
-              />
-              <p className="mt-1 text-xs text-gray-500">選填項目，如留空將自動填入 no@no.com</p>
-            </div>
-          </div>
-          
-          {/* 醫師選擇（初診和覆診都需要） */}
-          <div>
-            <label htmlFor="doctor_select" className="block text-sm font-medium text-gray-700 mb-1">
-              選擇醫師 <span className="text-red-500">*</span>
-            </label>
-            <select
-              id="doctor_select"
-              name="doctor_id"
-              value={formData.doctor_id?.toString() || ''}
-              onChange={(e) => {
-                const value = e.target.value ? parseInt(e.target.value, 10) : undefined;
-                console.log('選擇醫師:', value);
-                setFormData(prev => ({
-                  ...prev,
-                  doctor_id: value
-                }));
-              }}
-              className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              required
-              autoComplete="off"
-            >
-              <option value="">請選擇醫師</option>
-              {referenceData.doctors && Array.isArray(referenceData.doctors) && referenceData.doctors.length > 0 ? (
-                referenceData.doctors.map((doctor) => (
+                className="mt-1 block w-full px-3 py-2 border bg-white border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                required
+              >
+                <option value="">請選擇醫師</option>
+                {referenceData.doctors?.map((doctor) => (
                   <option key={doctor.id} value={doctor.id.toString()}>
                     {doctor.name} {doctor.specialty ? `(${doctor.specialty})` : ''}
                   </option>
-                ))
-              ) : (
-                <option value="" disabled>無可用醫師資料，請重新整理頁面</option>
-              )}
-            </select>
-            {/* 顯示醫師數據調試信息與刷新按鈕 */}
-            <div className="mt-1 flex items-center justify-between">
-              <span className="text-xs text-gray-400">
-                醫師數據: {referenceData.doctors && Array.isArray(referenceData.doctors) ? 
-                  `已載入 ${referenceData.doctors.length} 位醫師` : 
-                  '資料載入失敗'
-                }
-              </span>
-              {(!referenceData.doctors || !Array.isArray(referenceData.doctors) || referenceData.doctors.length === 0) && (
-                <button 
-                  type="button" 
-                  onClick={async () => {
-                    try {
-                      setMessage({
-                        type: 'info',
-                        text: '正在重新載入醫師資料...'
-                      });
-                      const data = await getReferenceData();
-                      setReferenceData(data);
-                      setMessage({
-                        type: 'success',
-                        text: '醫師資料重新載入成功'
-                      });
-                    } catch (error) {
-                      console.error('重新載入醫師資料失敗:', error);
-                      setMessage({
-                        type: 'error',
-                        text: '醫師資料重新載入失敗，請刷新頁面'
-                      });
-                    }
-                  }}
-                  className="text-sm text-blue-600 hover:text-blue-800"
-                >
-                  重新載入醫師資料
-                </button>
-              )}
-            </div>
-          </div>
-          
-          {/* 從哪裡認識我們（原資料來源） */}
-          <div>
-            <label htmlFor="data_source" className="block text-sm font-medium text-gray-700 mb-1">
-              從哪裡認識我們 <span className="text-red-500">*</span>
-            </label>
-            <select
-              id="data_source"
-              name="data_source"
-              value={formData.data_source}
-              onChange={handleInputChange}
-              className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              required
-              autoComplete="off"
-            >
-              <option value="">請選擇</option>
-              {referenceData.data_sources.map((source) => (
-                <option key={source} value={source}>
-                  {source}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          {/* 基礎疾病 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              基礎疾病 <span className="text-red-500">*</span>
-            </label>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              {referenceData.basic_diseases.map((disease, idx) => (
-                <label key={`basic_disease_${idx}`} className="inline-flex items-center">
-                  <input
-                    type="checkbox"
-                    id={`basic_disease_${idx}`}
-                    name={`basic_disease_${disease.replace(/[^a-zA-Z0-9]/g, '_')}`}
-                    checked={formData.basic_diseases.includes(disease)}
-                    onChange={(e) => handleCheckboxChange('basic_diseases', disease, e.target.checked)}
-                    className="form-checkbox h-5 w-5 text-indigo-600"
-                  />
-                  <span className="ml-2 text-gray-700">{disease}</span>
-                </label>
-              ))}
+                ))}
+              </select>
             </div>
             
-            {/* 調試信息，始終顯示 */}
-            <div className="mt-1 text-xs text-gray-400">
-              已選擇基礎疾病: {formData.basic_diseases.join(', ')}
+            {/* 提交按鈕 */}
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300 flex items-center"
+              >
+                {isLoading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    處理中...
+                  </>
+                ) : '提交表單'}
+              </button>
             </div>
-            
-            {/* 其他基礎疾病輸入框 - 永遠顯示 */}
-            <div className="mt-2 grid grid-cols-1">
-              <label htmlFor="other_basic_disease" className="block text-sm font-medium text-gray-700 mb-1">
-                請列明其他基礎疾病（如有）
-              </label>
-              <input
-                type="text"
-                id="other_basic_disease"
-                name="other_basic_disease"
-                value={otherBasicDisease}
-                onChange={(e) => {
-                  const newValue = e.target.value;
-                  setOtherBasicDisease(newValue);
-                  
-                  // 如果輸入了內容，自動勾選「其他，請列明」選項
-                  // 不論是否有內容，都確保選項被勾選
-                  const otherOption = '其他，請列明';
-                  if (!formData.basic_diseases.includes(otherOption)) {
-                    const updatedOptions = formData.basic_diseases.filter(item => !item.includes('我沒有'));
-                    updatedOptions.push(otherOption);
-                    setFormData(prev => ({
-                      ...prev,
-                      basic_diseases: updatedOptions
-                    }));
-                  }
-                }}
-                className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                placeholder="請輸入其他基礎疾病（如選擇「其他，請列明」選項）"
-                autoComplete="off"
-              />
-            </div>
-          </div>
-          
-          {/* 藥物過敏 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              藥物過敏 <span className="text-red-500">*</span>
-            </label>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              {referenceData.drug_allergies.map((allergy, idx) => (
-                <label key={`drug_allergy_${idx}`} className="inline-flex items-center">
-                  <input
-                    type="checkbox"
-                    id={`drug_allergy_${idx}`}
-                    name={`drug_allergy_${allergy.replace(/[^a-zA-Z0-9]/g, '_')}`}
-                    checked={formData.drug_allergies.includes(allergy)}
-                    onChange={(e) => handleCheckboxChange('drug_allergies', allergy, e.target.checked)}
-                    className="form-checkbox h-5 w-5 text-indigo-600"
-                  />
-                  <span className="ml-2 text-gray-700">{allergy}</span>
-                </label>
-              ))}
-            </div>
-            
-            {/* 調試信息，始終顯示 */}
-            <div className="mt-1 text-xs text-gray-400">
-              已選擇藥物過敏: {formData.drug_allergies.join(', ')}
-            </div>
-            
-            {/* 其他藥物過敏輸入框 - 永遠顯示 */}
-            <div className="mt-2 grid grid-cols-1">
-              <label htmlFor="other_drug_allergy" className="block text-sm font-medium text-gray-700 mb-1">
-                請列明其他藥物過敏（如有）
-              </label>
-              <input
-                type="text"
-                id="other_drug_allergy"
-                name="other_drug_allergy"
-                value={otherDrugAllergy}
-                onChange={(e) => {
-                  const newValue = e.target.value;
-                  setOtherDrugAllergy(newValue);
-                  
-                  // 不論是否有內容，都確保選項被勾選
-                  const otherOption = '其他，請列明';
-                  if (!formData.drug_allergies.includes(otherOption)) {
-                    const updatedOptions = formData.drug_allergies.filter(item => !item.includes('我沒有'));
-                    updatedOptions.push(otherOption);
-                    setFormData(prev => ({
-                      ...prev,
-                      drug_allergies: updatedOptions
-                    }));
-                  }
-                }}
-                className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                placeholder="請輸入其他藥物過敏（如選擇「其他，請列明」選項）"
-                autoComplete="off"
-              />
-            </div>
-          </div>
-          
-          {/* 食物過敏 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              食物過敏 <span className="text-red-500">*</span>
-            </label>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              {referenceData.food_allergies.map((allergy, idx) => (
-                <label key={`food_allergy_${idx}`} className="inline-flex items-center">
-                  <input
-                    type="checkbox"
-                    id={`food_allergy_${idx}`}
-                    name={`food_allergy_${allergy.replace(/[^a-zA-Z0-9]/g, '_')}`}
-                    checked={formData.food_allergies.includes(allergy)}
-                    onChange={(e) => handleCheckboxChange('food_allergies', allergy, e.target.checked)}
-                    className="form-checkbox h-5 w-5 text-indigo-600"
-                  />
-                  <span className="ml-2 text-gray-700">{allergy}</span>
-                </label>
-              ))}
-            </div>
-            
-            {/* 調試信息，始終顯示 */}
-            <div className="mt-1 text-xs text-gray-400">
-              已選擇食物過敏: {formData.food_allergies.join(', ')}
-            </div>
-            
-            {/* 其他食物過敏輸入框 - 永遠顯示 */}
-            <div className="mt-2 grid grid-cols-1">
-              <label htmlFor="other_food_allergy" className="block text-sm font-medium text-gray-700 mb-1">
-                請列明其他食物過敏（如有）
-              </label>
-              <input
-                type="text"
-                id="other_food_allergy"
-                name="other_food_allergy"
-                value={otherFoodAllergy}
-                onChange={(e) => {
-                  const newValue = e.target.value;
-                  setOtherFoodAllergy(newValue);
-                  
-                  // 不論是否有內容，都確保選項被勾選
-                  const otherOption = '其他，請列明';
-                  if (!formData.food_allergies.includes(otherOption)) {
-                    const updatedOptions = formData.food_allergies.filter(item => !item.includes('我沒有'));
-                    updatedOptions.push(otherOption);
-                    setFormData(prev => ({
-                      ...prev,
-                      food_allergies: updatedOptions
-                    }));
-                  }
-                }}
-                className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                placeholder="請輸入其他食物過敏（如選擇「其他，請列明」選項）"
-                autoComplete="off"
-              />
-            </div>
-          </div>
-          
-          {/* 區域選擇器 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              居住地區 <span className="text-red-500">*</span>
-            </label>
-            <RegionSelector
-              regions={referenceData.regions}
-              value={{
-                region: formData.region,
-                district: formData.district,
-                subDistrict: formData.sub_district
-              }}
-              onChange={handleRegionChange}
-              required
-            />
-          </div>
-          
-          {/* 提交按鈕 */}
-          <div className="pt-4 flex justify-center">
-            <button
-              type="submit"
-              disabled={isLoading}
-              className={`px-6 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
-            >
-              {isLoading ? '處理中...' : '提交患者登記'}
-            </button>
-          </div>
-        </form>
+          </form>
+        )}
       </div>
     </ErrorBoundary>
   );

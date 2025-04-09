@@ -10,6 +10,7 @@ interface RegionSelectorProps {
   };
   onChange: (value: { region: string; district: string; subDistrict: string }) => void;
   required?: boolean;
+  readOnly?: boolean;
 }
 
 const RegionSelector: React.FC<RegionSelectorProps> = ({
@@ -17,6 +18,7 @@ const RegionSelector: React.FC<RegionSelectorProps> = ({
   value,
   onChange,
   required = false,
+  readOnly = false,
 }) => {
   const [availableDistricts, setAvailableDistricts] = useState<string[]>([]);
   const [availableSubDistricts, setAvailableSubDistricts] = useState<string[]>([]);
@@ -77,8 +79,9 @@ const RegionSelector: React.FC<RegionSelectorProps> = ({
               subDistrict: '',
             });
           }}
-          className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          className={`mt-1 block w-full px-3 py-2 ${readOnly ? 'bg-gray-100' : 'bg-white'} border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
           required={required}
+          disabled={readOnly}
         >
           <option value="">請選擇區域</option>
           {Object.keys(regions).map((region) => (
@@ -103,8 +106,8 @@ const RegionSelector: React.FC<RegionSelectorProps> = ({
               subDistrict: '',
             });
           }}
-          className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-          disabled={!value.region || availableDistricts.length === 0}
+          className={`mt-1 block w-full px-3 py-2 ${readOnly ? 'bg-gray-100' : 'bg-white'} border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+          disabled={readOnly || !value.region || availableDistricts.length === 0}
           required={required}
         >
           <option value="">請選擇地區</option>
@@ -129,8 +132,8 @@ const RegionSelector: React.FC<RegionSelectorProps> = ({
               subDistrict: e.target.value,
             });
           }}
-          className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-          disabled={!value.district || availableSubDistricts.length === 0}
+          className={`mt-1 block w-full px-3 py-2 ${readOnly ? 'bg-gray-100' : 'bg-white'} border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+          disabled={readOnly || !value.district || availableSubDistricts.length === 0}
           required={required}
         >
           <option value="">請選擇細分地區</option>

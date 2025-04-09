@@ -13,6 +13,7 @@ export interface Patient {
   basic_diseases: string[];
   drug_allergies: string[];
   food_allergies: string[];
+  note?: string;
   
   // 預約相關
   registration_datetime: string;
@@ -42,6 +43,7 @@ export interface PatientCreateRequest {
   basic_diseases: string[];
   drug_allergies: string[];
   food_allergies: string[];
+  note?: string;
   
   has_appointment: boolean;
   doctor_id?: number;
@@ -63,6 +65,7 @@ export interface PatientUpdateRequest {
   basic_diseases?: string[];
   drug_allergies?: string[];
   food_allergies?: string[];
+  note?: string;
   
   doctor_id?: number;
   data_source?: string;
