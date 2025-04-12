@@ -1,48 +1,27 @@
 import axios, { AxiosError } from 'axios';
 
 /**
- * 從環境變數獲取後端 API 基本 URL
- * 僅部署環境：保證返回 /api/v1 開頭的相對路徑
+ * 提供API客戶端相關工具函數
  */
 
-export function getBackendUrl(path: string = ""): string {
-  // 1. 獲取環境變數中的基礎路徑
-  const basePath = typeof window === "undefined"
-    ? process.env.API_BASE_URL // server-side (middleware / route handler)
-    : process.env.NEXT_PUBLIC_API_BASE_URL; // client-side
-
-  // 2. 檢查基礎路徑是否存在
-  if (!basePath) {
-    console.error("🔴 嚴重錯誤: 缺少基礎 API URL 環境變數");
-    throw new Error("❌ 無法取得 API base URL，請確認 .env.production 已設置 API_BASE_URL 與 NEXT_PUBLIC_API_BASE_URL。");
-  }
-
-  // 3. 合成最終 URL
-  let finalUrl = `${basePath}${path.startsWith("/") ? path : "/" + path}`;
+/**
+ * 獲取完整的後端API URL
+ * @param {string} path - API路徑，例如 '/patient/1'
+ * @returns {string} 完整的API URL
+ */
+export const getBackendUrl = (path: string = ''): string => {
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1';
   
-  // 4. 記錄環境和使用的 URL 類型
-  if (typeof window === "undefined") {
-    console.log("🧪 [Server] 使用 API_BASE_URL:", process.env.API_BASE_URL);
-  } else {
-    console.log("🧪 [Client] 使用 NEXT_PUBLIC_API_BASE_URL:", process.env.NEXT_PUBLIC_API_BASE_URL);
+  // 確保路徑以/開頭，避免重複斜線
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  
+  // 日誌記錄最終使用的URL（僅開發環境）
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`API 完整路徑: ${apiBaseUrl}${normalizedPath}`);
   }
   
-  // 5. 檢查 URL 協議，確保使用 HTTPS
-  if (finalUrl.startsWith('http:')) {
-    console.warn('⚠️ 警告: 發現不安全的 HTTP URL:', finalUrl);
-    finalUrl = finalUrl.replace('http:', 'https:');
-    console.log('✅ 已修正為 HTTPS URL:', finalUrl);
-  }
-  
-  // 6. 檢查是否缺少協議前綴
-  if (!finalUrl.startsWith('http') && !finalUrl.startsWith('/')) {
-    console.warn('⚠️ 警告: URL 缺少協議前綴:', finalUrl);
-    finalUrl = 'https://' + finalUrl;
-    console.log('✅ 已修正為完整 URL:', finalUrl);
-  }
-  
-  return finalUrl;
-}
+  return `${apiBaseUrl}${normalizedPath}`;
+};
 
 /**
  * 錯誤處理工具類，提供統一的錯誤處理邏輯
@@ -55,26 +34,34 @@ export class ErrorHandler {
       const statusCode = error.response.status;
       console.error(`[${statusCode}錯誤] URL: ${error.config?.url}`);
 
-      if (statusCode === 422) return ErrorHandler.handleValidationError(error, context);
-      if (statusCode === 401) return {
-        message: '認證已過期或無效，請重新登入',
-        detail: '需要有效的認證才能繼續操作',
-        statusCode: 401,
-        isServerError: false
-      };
-      if (statusCode === 404) return {
-        message: '請求的資源不存在',
-        detail: `找不到指定的${context}資源`,
-        statusCode: 404,
-        isServerError: false
-      };
-      if (statusCode >= 500) return {
-        message: '伺服器處理請求時出錯',
-        detail: (error.response.data as any)?.detail || '服務暫時不可用，請稍後再試',
-        statusCode,
-        isServerError: true,
-        rawError: error.response.data
-      };
+      if (statusCode === 422) {
+        return ErrorHandler.handleValidationError(error, context);
+      }
+      if (statusCode === 401) {
+        return {
+          message: '認證已過期或無效，請重新登入',
+          detail: '需要有效的認證才能繼續操作',
+          statusCode: 401,
+          isServerError: false
+        };
+      }
+      if (statusCode === 404) {
+        return {
+          message: '請求的資源不存在',
+          detail: `找不到指定的${context}資源`,
+          statusCode: 404,
+          isServerError: false
+        };
+      }
+      if (statusCode >= 500) {
+        return {
+          message: '伺服器處理請求時出錯',
+          detail: (error.response.data as any)?.detail || '服務暫時不可用，請稍後再試',
+          statusCode,
+          isServerError: true,
+          rawError: error.response.data
+        };
+      }
 
       return {
         message: '請求處理失敗',
@@ -132,7 +119,9 @@ export class ErrorHandler {
   }
 
   static formatErrorForDisplay(error: any): string {
-    if (typeof error === 'string') return error;
+    if (typeof error === 'string') {
+      return error;
+    }
 
     if (error.fieldErrors && Object.keys(error.fieldErrors).length > 0) {
       return Object.entries(error.fieldErrors)
@@ -176,7 +165,9 @@ const apiClient = axios.create({
 // 攔截器
 apiClient.interceptors.request.use((config) => {
   console.log(`[API請求] ${config.method?.toUpperCase()} ${config.url}`);
-  if (config.params) console.log(`[請求參數] ${JSON.stringify(config.params)}`);
+  if (config.params) {
+    console.log(`[請求參數] ${JSON.stringify(config.params)}`);
+  }
   if (config.data && typeof config.data !== 'string') {
     try {
       console.log(`[請求數據] ${JSON.stringify(config.data)}`);

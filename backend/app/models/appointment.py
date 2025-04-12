@@ -22,4 +22,7 @@ class Appointment(Base):
     updated_at = Column(DateTime, default=lambda: now_hk(), onupdate=lambda: now_hk())
 
     doctor = relationship("Doctor", backref="appointments")
-    related_appointment = relationship("Appointment", remote_side=[id], backref="follow_up_appointments") 
+    related_appointment = relationship("Appointment", remote_side=[id], backref="follow_up_appointments")
+    
+    # 關聯醫療記錄
+    medical_record = relationship("MedicalRecord", back_populates="appointment", uselist=False) 

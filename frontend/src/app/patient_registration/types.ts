@@ -8,6 +8,7 @@ export interface Patient {
   birth_date: string;
   phone_number: string;
   email?: string;
+  gender?: string;
   
   // 健康相關資訊
   basic_diseases: string[];
@@ -39,11 +40,13 @@ export interface PatientCreateRequest {
   birth_date: string;
   phone_number: string;
   email?: string;
+  gender?: string;
   
   basic_diseases: string[];
   drug_allergies: string[];
   food_allergies: string[];
   note?: string;
+  chief_complaint?: string;
   
   has_appointment: boolean;
   doctor_id?: number;
@@ -61,6 +64,7 @@ export interface PatientUpdateRequest {
   birth_date?: string;
   phone_number?: string;
   email?: string;
+  gender?: string;
   
   basic_diseases?: string[];
   drug_allergies?: string[];

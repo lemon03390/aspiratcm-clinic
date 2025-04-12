@@ -84,6 +84,7 @@ const PatientForm: React.FC = () => {
     birth_date: '',
     phone_number: '',
     email: 'no@no.com', // 確保初始值為 no@no.com
+    gender: '',
     basic_diseases: ['我沒有任何基礎病'],
     drug_allergies: ['我沒有任何藥物過敏'],
     food_allergies: ['我沒有任何食物過敏'],
@@ -94,6 +95,7 @@ const PatientForm: React.FC = () => {
     region: '',
     district: '',
     sub_district: '',
+    chief_complaint: '', // 新增主訴欄位
   });
 
   // 加載參考數據
@@ -360,6 +362,7 @@ const PatientForm: React.FC = () => {
         birth_date: '',
         phone_number: '',
         email: 'no@no.com', // 設置為 no@no.com 而非空字串
+        gender: '',
         basic_diseases: ['我沒有任何基礎病'],
         drug_allergies: ['我沒有任何藥物過敏'],
         food_allergies: ['我沒有任何食物過敏'],
@@ -370,6 +373,7 @@ const PatientForm: React.FC = () => {
         region: '',
         district: '',
         sub_district: '',
+        chief_complaint: '', // 重置主訴欄位
       });
       setOtherBasicDisease('');
       setOtherDrugAllergy('');
@@ -435,6 +439,7 @@ const PatientForm: React.FC = () => {
         birth_date: patient.birth_date,
         phone_number: patient.phone_number,
         email: patient.email || '',
+        gender: patient.gender || '',
         basic_diseases: patient.basic_diseases,
         drug_allergies: patient.drug_allergies,
         food_allergies: patient.food_allergies,
@@ -445,6 +450,7 @@ const PatientForm: React.FC = () => {
         region: patient.region,
         district: patient.district,
         sub_district: patient.sub_district,
+        chief_complaint: patient.chief_complaint || '', // 設置主訴欄位
       });
       
       // 檢查是否有「其他，請列明」項目，如有則提取內容到對應輸入框狀態
@@ -519,7 +525,7 @@ const PatientForm: React.FC = () => {
             !item.startsWith('其他:') && 
             !item.startsWith('其他，請列明:')
           ), 
-          '其他，請列明'
+          '其他疾病，請列明'
         ]
       }));
     } else if (field === 'drug_allergies') {
@@ -531,7 +537,7 @@ const PatientForm: React.FC = () => {
             !item.startsWith('其他藥物:') && 
             !item.startsWith('其他，請列明:')
           ), 
-          '其他，請列明'
+          '其他藥物，請列明'
         ]
       }));
     } else if (field === 'food_allergies') {
@@ -543,7 +549,7 @@ const PatientForm: React.FC = () => {
             !item.startsWith('其他食物:') && 
             !item.startsWith('其他，請列明:')
           ), 
-          '其他，請列明'
+          '其他食物，請列明'
         ]
       }));
     }
@@ -648,19 +654,19 @@ const PatientForm: React.FC = () => {
       }
       
       // 處理藥物過敏
-      if (processedData.drug_allergies.includes('其他，請列明') && otherDrugAllergy.trim()) {
+      if (processedData.drug_allergies.includes('其他藥物，請列明') && otherDrugAllergy.trim()) {
         // 創建新的陣列，避免修改原有陣列
         const newDrugAllergies = [...processedData.drug_allergies];
-        // 找到「其他，請列明」的索引位置
-        const otherIndex = newDrugAllergies.indexOf('其他，請列明');
-        // 將「其他，請列明」替換為格式化的字符串 - 修正格式
+        // 找到「其他藥物，請列明」的索引位置
+        const otherIndex = newDrugAllergies.indexOf('其他藥物，請列明');
+        // 將「其他藥物，請列明」替換為格式化的字符串
         if (otherIndex !== -1) {
-          newDrugAllergies[otherIndex] = `其他，請列明: ${otherDrugAllergy.trim()}`;
+          newDrugAllergies[otherIndex] = `其他藥物: ${otherDrugAllergy.trim()}`;
           processedData.drug_allergies = newDrugAllergies;
         }
-      } else if (processedData.drug_allergies.includes('其他，請列明')) {
+      } else if (processedData.drug_allergies.includes('其他藥物，請列明')) {
         // 若沒有填寫「其他」內容，則移除「其他」選項
-        processedData.drug_allergies = processedData.drug_allergies.filter(d => d !== '其他，請列明');
+        processedData.drug_allergies = processedData.drug_allergies.filter(d => d !== '其他藥物，請列明');
         
         // 如果移除後沒有選項，則添加"無"選項
         if (processedData.drug_allergies.length === 0) {
@@ -669,19 +675,19 @@ const PatientForm: React.FC = () => {
       }
       
       // 處理食物過敏
-      if (processedData.food_allergies.includes('其他，請列明') && otherFoodAllergy.trim()) {
+      if (processedData.food_allergies.includes('其他食物，請列明') && otherFoodAllergy.trim()) {
         // 創建新的陣列，避免修改原有陣列
         const newFoodAllergies = [...processedData.food_allergies];
-        // 找到「其他，請列明」的索引位置
-        const otherIndex = newFoodAllergies.indexOf('其他，請列明');
-        // 將「其他，請列明」替換為格式化的字符串 - 修正格式
+        // 找到「其他食物，請列明」的索引位置
+        const otherIndex = newFoodAllergies.indexOf('其他食物，請列明');
+        // 將「其他食物，請列明」替換為格式化的字符串
         if (otherIndex !== -1) {
-          newFoodAllergies[otherIndex] = `其他，請列明: ${otherFoodAllergy.trim()}`;
+          newFoodAllergies[otherIndex] = `其他食物: ${otherFoodAllergy.trim()}`;
           processedData.food_allergies = newFoodAllergies;
         }
-      } else if (processedData.food_allergies.includes('其他，請列明')) {
+      } else if (processedData.food_allergies.includes('其他食物，請列明')) {
         // 若沒有填寫「其他」內容，則移除「其他」選項
-        processedData.food_allergies = processedData.food_allergies.filter(d => d !== '其他，請列明');
+        processedData.food_allergies = processedData.food_allergies.filter(d => d !== '其他食物，請列明');
         
         // 如果移除後沒有選項，則添加"無"選項
         if (processedData.food_allergies.length === 0) {
@@ -981,6 +987,7 @@ const PatientForm: React.FC = () => {
                 birth_date: '',
                 phone_number: '',
                 email: 'no@no.com',
+                gender: '',
                 basic_diseases: ['我沒有任何基礎病'],
                 drug_allergies: ['我沒有任何藥物過敏'],
                 food_allergies: ['我沒有任何食物過敏'],
@@ -991,6 +998,7 @@ const PatientForm: React.FC = () => {
                 region: '',
                 district: '',
                 sub_district: '',
+                chief_complaint: '', // 重置主訴欄位
               });
               setHasBasicDisease(false);
               setHasDrugAllergy(false);
@@ -1241,6 +1249,24 @@ const PatientForm: React.FC = () => {
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                  性別 <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="gender"
+                  value={formData.gender}
+                  onChange={handleInputChange}
+                  required
+                  className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                >
+                  <option value="">請選擇</option>
+                  <option value="男">男</option>
+                  <option value="女">女</option>
+                  <option value="其他">其他</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   從何得知本診所 <span className="text-red-500">*</span>
                 </label>
                 <select
@@ -1433,7 +1459,7 @@ const PatientForm: React.FC = () => {
                 </div>
                 
                 {/* 其他藥物過敏輸入框 */}
-                {formData.drug_allergies.includes('其他，請列明') && (
+                {formData.drug_allergies.includes('其他藥物，請列明') && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       其他藥物過敏，請列明
@@ -1446,7 +1472,7 @@ const PatientForm: React.FC = () => {
                       className={`mt-1 block w-full px-3 py-2 border ${fieldsReadOnly ? 'bg-gray-100' : 'bg-gray-50'} border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
                       placeholder="請詳細說明其他藥物過敏"
                     />
-                    {formData.drug_allergies.includes('其他，請列明') && !otherDrugAllergy && (
+                    {formData.drug_allergies.includes('其他藥物，請列明') && !otherDrugAllergy && (
                       <p className="text-sm text-red-600 mt-1">請填寫藥物過敏細節</p>
                     )}
                   </div>
@@ -1476,7 +1502,7 @@ const PatientForm: React.FC = () => {
                 </div>
                 
                 {/* 其他食物過敏輸入框 */}
-                {formData.food_allergies.includes('其他，請列明') && (
+                {formData.food_allergies.includes('其他食物，請列明') && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       其他食物過敏，請列明
@@ -1489,7 +1515,7 @@ const PatientForm: React.FC = () => {
                       className={`mt-1 block w-full px-3 py-2 border ${fieldsReadOnly ? 'bg-gray-100' : 'bg-gray-50'} border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
                       placeholder="請詳細說明其他食物過敏"
                     />
-                    {formData.food_allergies.includes('其他，請列明') && !otherFoodAllergy && (
+                    {formData.food_allergies.includes('其他食物，請列明') && !otherFoodAllergy && (
                       <p className="text-sm text-red-600 mt-1">請填寫食物過敏細節</p>
                     )}
                   </div>
@@ -1510,6 +1536,22 @@ const PatientForm: React.FC = () => {
                 rows={3}
                 className={`mt-1 block w-full px-3 py-2 border ${fieldsReadOnly ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
                 placeholder="例如：偏好女醫師，懂英語，請準備輪椅"
+              />
+            </div>
+            
+            {/* 主訴欄位 */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                自述主訴（選填）
+              </label>
+              <textarea
+                name="chief_complaint"
+                value={formData.chief_complaint}
+                onChange={handleInputChange}
+                disabled={fieldsReadOnly}
+                rows={3}
+                className={`mt-1 block w-full px-3 py-2 border ${fieldsReadOnly ? 'bg-gray-100' : 'bg-white'} border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+                placeholder="請簡述您的不適或求診原因"
               />
             </div>
             

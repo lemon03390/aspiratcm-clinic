@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON, Date, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON, Date, Boolean, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from app.models.base import Base
 from app.utils.time import now_hk
@@ -14,11 +15,15 @@ class Patient(Base):
     birth_date = Column(Date, nullable=False)
     phone_number = Column(String, nullable=False)
     email = Column(String, nullable=True)
+    gender = Column(String, nullable=True)  # 新增性別欄位
     
     # 健康相關資訊
     basic_diseases = Column(JSON, nullable=True)  # 基礎疾病（JSON數組）
     drug_allergies = Column(JSON, nullable=True)  # 藥物過敏（JSON數組）
     food_allergies = Column(JSON, nullable=True)  # 食物過敏（JSON數組）
+    note = Column(Text, nullable=True)  # 患者備註
+    chief_complaint = Column(Text, nullable=True)  # 主訴
+    health_profile = Column(JSONB, nullable=True)  # 健康檔案 (統一存放患者健康初始資料)
     
     # 預約相關
     registration_datetime = Column(DateTime, default=lambda: now_hk())  # 掛號日期時間
@@ -42,4 +47,7 @@ class Patient(Base):
     appointments = relationship("Appointment", primaryjoin="and_(Patient.chinese_name==Appointment.patient_name, "
                                                "Patient.phone_number==Appointment.phone_number)",
                                foreign_keys="[Appointment.patient_name, Appointment.phone_number]",
-                               uselist=True, viewonly=True) 
+                               uselist=True, viewonly=True)
+                               
+    # 關聯醫療記錄
+    medical_records = relationship("MedicalRecord", back_populates="patient", cascade="all, delete-orphan") 

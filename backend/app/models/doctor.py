@@ -12,4 +12,7 @@ class Doctor(Base):
     phone = Column(String)
     schedule = Column(ARRAY(String), server_default='{}', nullable=True)
     created_at = Column(DateTime, default=lambda: now_hk())
-    updated_at = Column(DateTime, default=lambda: now_hk(), onupdate=lambda: now_hk()) 
+    updated_at = Column(DateTime, default=lambda: now_hk(), onupdate=lambda: now_hk())
+    
+    # 關聯醫療記錄
+    medical_records = relationship("MedicalRecord", back_populates="doctor") 

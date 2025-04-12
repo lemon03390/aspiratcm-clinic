@@ -1,6 +1,7 @@
 "use client";
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import PatientForm from './components/PatientForm';
+import { Patient } from './types';
 
 // 頁面級錯誤邊界
 class PageErrorBoundary extends Component<
@@ -53,6 +54,83 @@ class PageErrorBoundary extends Component<
     return this.props.children;
   }
 }
+
+// 在掛號成功頁面添加跳轉到病歷系統按鈕
+const RegistrationSuccess = ({ patient, onRegisterAnother, onViewDetails }: { 
+  patient: Patient, 
+  onRegisterAnother: () => void,
+  onViewDetails: () => void
+}) => {
+  return (
+    <div className="bg-white p-6 rounded-lg shadow-md">
+      <div className="flex items-center text-green-600 mb-4">
+        <svg 
+          xmlns="http://www.w3.org/2000/svg" 
+          className="h-8 w-8 mr-2" 
+          fill="none" 
+          viewBox="0 0 24 24" 
+          stroke="currentColor"
+        >
+          <path 
+            strokeLinecap="round" 
+            strokeLinejoin="round" 
+            strokeWidth={2} 
+            d="M5 13l4 4L19 7" 
+          />
+        </svg>
+        <h2 className="text-xl font-semibold">掛號成功</h2>
+      </div>
+      
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <div>
+          <p className="text-gray-600">患者姓名</p>
+          <p className="font-medium">{patient.chinese_name}</p>
+        </div>
+        <div>
+          <p className="text-gray-600">掛號編號</p>
+          <p className="font-medium">{patient.registration_number}</p>
+        </div>
+        <div>
+          <p className="text-gray-600">主診醫師</p>
+          <p className="font-medium">{patient.doctor_id ? `醫師ID: ${patient.doctor_id}` : '未指定'}</p>
+        </div>
+        <div>
+          <p className="text-gray-600">登記時間</p>
+          <p className="font-medium">
+            {new Date(patient.registration_datetime).toLocaleString('zh-TW', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit'
+            })}
+          </p>
+        </div>
+      </div>
+      
+      <div className="flex space-x-3 mt-6">
+        <button
+          onClick={onRegisterAnother}
+          className="flex-1 py-2 px-4 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+        >
+          再登記一位病人
+        </button>
+        <button
+          onClick={onViewDetails}
+          className="flex-1 py-2 px-4 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+        >
+          查看患者詳情
+        </button>
+        <a
+          href="/medical_record"
+          className="flex-1 py-2 px-4 bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors text-center"
+        >
+          前往病歷系統
+        </a>
+      </div>
+    </div>
+  );
+};
 
 export default function PatientRegistrationPage() {
   return (

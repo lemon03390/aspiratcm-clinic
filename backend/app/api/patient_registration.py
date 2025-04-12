@@ -2,14 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Body, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from typing import List, Optional, Dict, Any
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from pydantic import BaseModel, Field, validator, EmailStr, constr
 import re
 import json
 import logging
 from app.db import get_db
-from app.models import Patient, Doctor, Appointment
+from app.models import Patient, Doctor, Appointment, MedicalRecord, WaitingList
 from app.utils.time import now_hk
+from app.utils.waiting_list_helper import add_to_waiting_list, remove_from_waiting_list
 
 # 設置日誌
 logger = logging.getLogger(__name__)
@@ -18,8 +19,8 @@ router = APIRouter()
 
 # 基礎疾病、藥物過敏和食物過敏的列表
 BASIC_DISEASES = ["我沒有任何基礎病", "高血壓", "糖尿病", "心臟病", "肝臟疾病", "腎臟疾病", "其他，請列明"]
-DRUG_ALLERGIES = ["我沒有任何藥物過敏", "青黴素", "磺胺類", "阿司匹林", "非甾體抗炎藥", "其他，請列明"]
-FOOD_ALLERGIES = ["我沒有任何食物過敏", "海鮮", "花生", "蛋類", "牛奶", "麩質", "其他，請列明"]
+DRUG_ALLERGIES = ["我沒有任何藥物過敏", "青黴素", "磺胺類", "阿司匹林", "非甾體抗炎藥", "其他藥物，請列明"]
+FOOD_ALLERGIES = ["我沒有任何食物過敏", "海鮮", "花生", "蛋類", "牛奶", "麩質", "其他食物，請列明"]
 
 # 資料來源列表
 DATA_SOURCES = ["朋友介紹", "Facebook", "Instagram", "Threads", "Google", "其他"]
@@ -68,10 +69,13 @@ class PatientBase(BaseModel):
     birth_date: date = Field(..., description="出生日期")
     phone_number: str = Field(..., min_length=8, max_length=20, description="聯絡電話")
     email: Optional[EmailStr] = Field(None, description="電郵地址")
+    gender: Optional[str] = Field(None, description="性別")
     
     basic_diseases: List[str] = Field(..., description="基礎疾病")
     drug_allergies: List[str] = Field(..., description="藥物過敏")
     food_allergies: List[str] = Field(..., description="食物過敏")
+    note: Optional[str] = Field(None, description="備註")
+    chief_complaint: Optional[str] = Field(None, description="主訴")
     
     has_appointment: bool = Field(False, description="是否已有預約")
     doctor_id: Optional[int] = Field(None, description="應診醫師")
@@ -92,7 +96,7 @@ class PatientBase(BaseModel):
         if not v or len(v) == 0:
             raise ValueError("請至少選擇一項基礎疾病選項")
         for item in v:
-            if item not in BASIC_DISEASES and not item.startswith("其他，請列明:") and not item.startswith("其他:"):
+            if item not in BASIC_DISEASES and not item.startswith("其他，請列明:") and not item.startswith("其他:") and item != "其他症病，請列明":
                 raise ValueError(f"基礎疾病選項 '{item}' 無效")
         return v
     
@@ -101,7 +105,7 @@ class PatientBase(BaseModel):
         if not v or len(v) == 0:
             raise ValueError("請至少選擇一項藥物過敏選項")
         for item in v:
-            if item not in DRUG_ALLERGIES and not item.startswith("其他，請列明:") and not item.startswith("其他藥物:"):
+            if item not in DRUG_ALLERGIES and not item.startswith("其他，請列明:") and not item.startswith("其他藥物:") and item != "其他藥物，請列明":
                 raise ValueError(f"藥物過敏選項 '{item}' 無效")
         return v
     
@@ -110,7 +114,7 @@ class PatientBase(BaseModel):
         if not v or len(v) == 0:
             raise ValueError("請至少選擇一項食物過敏選項")
         for item in v:
-            if item not in FOOD_ALLERGIES and not item.startswith("其他，請列明:") and not item.startswith("其他食物:"):
+            if item not in FOOD_ALLERGIES and not item.startswith("其他，請列明:") and not item.startswith("其他食物:") and item != "其他食物，請列明":
                 raise ValueError(f"食物過敏選項 '{item}' 無效")
         return v
     
@@ -170,10 +174,13 @@ class PatientUpdate(BaseModel):
     birth_date: Optional[date] = None
     phone_number: Optional[str] = None
     email: Optional[EmailStr] = None
+    gender: Optional[str] = None
     
     basic_diseases: Optional[List[str]] = None
     drug_allergies: Optional[List[str]] = None
     food_allergies: Optional[List[str]] = None
+    note: Optional[str] = None
+    chief_complaint: Optional[str] = None
     
     doctor_id: Optional[int] = None
     data_source: Optional[str] = None
@@ -261,65 +268,6 @@ async def check_patient(
         )
 
 
-# 創建新患者
-@router.post("/", response_model=PatientResponse, status_code=status.HTTP_201_CREATED)
-async def create_patient(patient: PatientCreate, db: Session = Depends(get_db)):
-    # 檢查醫師是否存在
-    if patient.doctor_id and not (doctor := db.query(Doctor).filter(Doctor.id == patient.doctor_id).first()):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"編號為 {patient.doctor_id} 的醫師不存在"
-        )
-    
-    # 檢查身份證號碼是否已存在
-    if db.query(Patient).filter(Patient.id_number == patient.id_number).first():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="具有此身份證號碼的患者已存在"
-        )
-    
-    # 生成唯一掛號編號
-    registration_number = generate_registration_number()
-    
-    # 設置 JSON 列
-    db_patient = Patient(
-        registration_number=registration_number,
-        chinese_name=patient.chinese_name,
-        english_name=patient.english_name,
-        id_number=patient.id_number,
-        birth_date=patient.birth_date,
-        phone_number=patient.phone_number,
-        email=patient.email,
-        basic_diseases=patient.basic_diseases,
-        drug_allergies=patient.drug_allergies,
-        food_allergies=patient.food_allergies,
-        has_appointment=patient.has_appointment,
-        doctor_id=patient.doctor_id,
-        data_source=patient.data_source,
-        region=patient.region,
-        district=patient.district,
-        sub_district=patient.sub_district,
-    )
-    
-    try:
-        db.add(db_patient)
-        db.commit()
-        db.refresh(db_patient)
-        return db_patient
-    except IntegrityError as e:
-        db.rollback()
-        error_detail = str(e)
-        if "unique constraint" in error_detail.lower():
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="患者資料衝突，可能身份證號碼或掛號編號已存在"
-            )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"創建患者時出錯: {error_detail}"
-        )
-
-
 # 獲取所有患者列表
 @router.get("/", response_model=List[PatientResponse])
 async def get_patients(
@@ -330,15 +278,56 @@ async def get_patients(
     return db.query(Patient).offset(skip).limit(limit).all()
 
 
-# 獲取單個患者詳情
-@router.get("/{patient_id}", response_model=PatientResponse)
-async def get_patient(patient_id: int, db: Session = Depends(get_db)):
-    if not (patient := db.query(Patient).filter(Patient.id == patient_id).first()):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"編號為 {patient_id} 的患者不存在"
+# 獲取候診患者列表
+@router.get("/waiting-list", response_model=List[dict])
+async def get_waiting_list(db: Session = Depends(get_db)):
+    """
+    從 waiting_list 表中獲取候診患者清單
+    """
+    try:
+        # 查詢等候清單
+        waiting_entries = (
+            db.query(WaitingList)
+            .order_by(WaitingList.created_at)
+            .all()
         )
-    return patient
+
+        result = []
+        for entry in waiting_entries:
+            try:
+                # 嘗試取得醫師名稱
+                doctor_name = None
+                if entry.doctor_id:
+                    doctor = db.query(Doctor).filter(Doctor.id == entry.doctor_id).first()
+                    doctor_name = doctor.name if doctor else None
+
+                # 判斷是否首診
+                is_first_visit = not db.query(MedicalRecord).filter(
+                    MedicalRecord.patient_id == entry.patient_id
+                ).first()
+
+                # 建立返回格式
+                result.append({
+                    "id": str(entry.id),
+                    "patient_id": entry.patient_id,
+                    "name": entry.chinese_name or "",
+                    "registration_number": entry.registration_number or "",
+                    "isFirstVisit": is_first_visit,
+                    "waitingSince": entry.created_at.strftime("%H:%M") if entry.created_at else "00:00",
+                    "doctor_name": doctor_name or "",
+                    "status": "waiting"
+                })
+
+            except Exception as inner_err:
+                logger.error(f"處理候診患者 {entry.patient_id} 資料時出錯: {str(inner_err)}")
+                continue
+
+        logger.info(f"成功回傳候診清單，共 {len(result)} 名患者")
+        return result
+
+    except Exception as e:
+        logger.error(f"獲取候診名單時發生錯誤: {str(e)}")
+        return []  # 永不丟 422
 
 
 # 通過掛號編號獲取患者
@@ -364,6 +353,120 @@ async def get_patient_by_phone_number(phone_number: str, db: Session = Depends(g
             detail=f"電話號碼為 {phone_number} 的患者不存在"
         )
     return patient
+
+
+# 獲取單個患者詳情
+@router.get("/{patient_id}", response_model=PatientResponse)
+async def get_patient(patient_id: int, db: Session = Depends(get_db)):
+    if not (patient := db.query(Patient).filter(Patient.id == patient_id).first()):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"編號為 {patient_id} 的患者不存在"
+        )
+    return patient
+
+
+# 創建新患者
+@router.post("/", response_model=PatientResponse, status_code=status.HTTP_201_CREATED)
+async def create_patient(patient: PatientCreate, db: Session = Depends(get_db)):
+    # 檢查醫師是否存在
+    if patient.doctor_id and not (doctor := db.query(Doctor).filter(Doctor.id == patient.doctor_id).first()):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"編號為 {patient.doctor_id} 的醫師不存在"
+        )
+    
+    # 檢查身份證號碼是否已存在
+    if db.query(Patient).filter(Patient.id_number == patient.id_number).first():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="具有此身份證號碼的患者已存在"
+        )
+    
+    # 生成唯一掛號編號
+    registration_number = generate_registration_number()
+    
+    # 組織 health_profile 欄位，整合患者健康相關數據供AI處理
+    health_profile = {
+        # 個人資料
+        "chinese_name": patient.chinese_name,
+        "english_name": patient.english_name,
+        "gender": patient.gender,
+        
+        # 出生與地區信息
+        "birth_date": str(patient.birth_date),
+        "region": patient.region,
+        "district": patient.district,
+        "sub_district": patient.sub_district,
+        
+        # 健康相關信息
+        "basic_diseases": patient.basic_diseases,
+        "drug_allergies": patient.drug_allergies,
+        "food_allergies": patient.food_allergies,
+        
+        # 診斷相關信息
+        "chief_complaint": patient.chief_complaint,
+        "note": patient.note,
+        
+        # 其他相關信息
+        "data_source": patient.data_source,
+        "doctor_id": patient.doctor_id,
+        
+        # 元數據
+        "created_at": now_hk().isoformat(),
+    }
+    
+    # 設置 JSON 列
+    db_patient = Patient(
+        registration_number=registration_number,
+        chinese_name=patient.chinese_name,
+        english_name=patient.english_name,
+        id_number=patient.id_number,
+        birth_date=patient.birth_date,
+        phone_number=patient.phone_number,
+        email=patient.email,
+        gender=patient.gender,
+        basic_diseases=patient.basic_diseases,
+        drug_allergies=patient.drug_allergies,
+        food_allergies=patient.food_allergies,
+        note=patient.note,
+        chief_complaint=patient.chief_complaint,
+        health_profile=health_profile,
+        has_appointment=patient.has_appointment,
+        doctor_id=patient.doctor_id,
+        data_source=patient.data_source,
+        region=patient.region,
+        district=patient.district,
+        sub_district=patient.sub_district,
+    )
+    
+    try:
+        db.add(db_patient)
+        db.commit()
+        db.refresh(db_patient)
+        
+        # 將新患者添加到候診清單
+        add_to_waiting_list(
+            db=db,
+            patient_id=db_patient.id,
+            registration_number=db_patient.registration_number,
+            chinese_name=db_patient.chinese_name,
+            doctor_id=db_patient.doctor_id
+        )
+        
+        return db_patient
+    except IntegrityError as e:
+        db.rollback()
+        error_detail = str(e)
+        if "unique constraint" in error_detail.lower():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="患者資料衝突，可能身份證號碼或掛號編號已存在"
+            )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"創建患者時出錯: {error_detail}"
+        )
 
 
 # 更新患者資料
@@ -392,9 +495,65 @@ async def update_patient(
     for key, value in update_data.items():
         setattr(db_patient, key, value)
     
+    # 更新 health_profile，確保它反映最新的健康相關資料
+    current_profile = db_patient.health_profile or {}
+    
+    # 更新個人資料
+    if "chinese_name" in update_data:
+        current_profile["chinese_name"] = update_data["chinese_name"]
+    if "english_name" in update_data:
+        current_profile["english_name"] = update_data["english_name"]
+    if "gender" in update_data:
+        current_profile["gender"] = update_data["gender"]
+    
+    # 更新地區資料
+    if "region" in update_data:
+        current_profile["region"] = update_data["region"]
+    if "district" in update_data:
+        current_profile["district"] = update_data["district"]
+    if "sub_district" in update_data:
+        current_profile["sub_district"] = update_data["sub_district"]
+    
+    # 更新健康相關資料
+    if "basic_diseases" in update_data:
+        current_profile["basic_diseases"] = update_data["basic_diseases"]
+    if "drug_allergies" in update_data:
+        current_profile["drug_allergies"] = update_data["drug_allergies"]
+    if "food_allergies" in update_data:
+        current_profile["food_allergies"] = update_data["food_allergies"]
+    if "note" in update_data:
+        current_profile["note"] = update_data["note"]
+    if "chief_complaint" in update_data:
+        current_profile["chief_complaint"] = update_data["chief_complaint"]
+    
+    # 更新其他資料
+    if "doctor_id" in update_data:
+        current_profile["doctor_id"] = update_data["doctor_id"]
+    if "data_source" in update_data:
+        current_profile["data_source"] = update_data["data_source"]
+    if "birth_date" in update_data:
+        current_profile["birth_date"] = str(update_data["birth_date"])
+    
+    # 更新元數據
+    current_profile["updated_at"] = now_hk().isoformat()
+    
+    # 設置更新後的 health_profile
+    db_patient.health_profile = current_profile
+    
     try:
         db.commit()
         db.refresh(db_patient)
+        
+        # 對於更新的患者，檢查是否需要將其添加到候診清單
+        # 這通常發生在患者回訪時
+        add_to_waiting_list(
+            db=db,
+            patient_id=db_patient.id,
+            registration_number=db_patient.registration_number,
+            chinese_name=db_patient.chinese_name,
+            doctor_id=db_patient.doctor_id
+        )
+        
         return db_patient
     except IntegrityError as e:
         db.rollback()
@@ -415,4 +574,24 @@ async def delete_patient(patient_id: int, db: Session = Depends(get_db)):
     
     db.delete(db_patient)
     db.commit()
-    return {"message": "患者已成功刪除"} 
+    return {"message": "患者已成功刪除"}
+
+
+# 刪除候診清單中的患者
+@router.delete("/waiting-list/{patient_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_from_waiting_list(patient_id: int, db: Session = Depends(get_db)):
+    """
+    從候診清單中移除指定患者
+    """
+    try:
+        # 調用移除函數
+        result = remove_from_waiting_list(db, patient_id)
+        
+        return {"message": "患者已從候診清單中移除" if result else "患者不在候診清單中，無需移除"}
+            
+    except Exception as e:
+        logger.error(f"移除候診患者時出錯: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"移除候診患者時出錯: {str(e)}"
+        )

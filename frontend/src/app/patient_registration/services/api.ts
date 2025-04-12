@@ -202,6 +202,44 @@ export async function createPatient(patientData: PatientCreateRequest): Promise<
     
     console.log("API 最終請求數據:", JSON.stringify(processedData));
     
+    // 首先檢查該身份證號碼是否已存在
+    try {
+      const checkResponse = await checkIdNumber(processedData.id_number);
+      
+      // 如果患者存在，則使用PATCH請求更新該患者資料
+      if (checkResponse.exists && checkResponse.patient) {
+        console.log('患者已存在，更新現有記錄而非創建新記錄');
+        const patientId = checkResponse.patient.id;
+        
+        // 使用updatePatient函數更新現有患者資料
+        const updateData: PatientUpdateRequest = {
+          chinese_name: processedData.chinese_name,
+          english_name: processedData.english_name,
+          birth_date: processedData.birth_date,
+          phone_number: processedData.phone_number,
+          email: processedData.email,
+          gender: processedData.gender,
+          basic_diseases: processedData.basic_diseases,
+          drug_allergies: processedData.drug_allergies,
+          food_allergies: processedData.food_allergies,
+          note: processedData.note,
+          doctor_id: processedData.doctor_id,
+          data_source: processedData.data_source,
+          region: processedData.region,
+          district: processedData.district,
+          sub_district: processedData.sub_district
+        };
+        
+        const updatedPatient = await updatePatient(patientId, updateData);
+        console.log('✅ 患者資料更新成功:', updatedPatient);
+        return updatedPatient;
+      }
+    } catch (checkError) {
+      // 檢查失敗，忽略錯誤並繼續嘗試創建新患者
+      console.log('檢查患者是否存在時出錯，嘗試直接創建:', checkError);
+    }
+    
+    // 如果患者不存在或檢查失敗，則創建新患者
     const url = ensureHttps(getBackendUrl('/patient_registration/'));
     console.log('🔷 提交患者數據到:', url);
     const response = await axios.post<Patient>(url, processedData);
@@ -209,6 +247,45 @@ export async function createPatient(patientData: PatientCreateRequest): Promise<
     return response.data;
   } catch (error: any) {
     console.error('❌ 創建患者失敗:', error);
+
+    // 處理 409 衝突錯誤（患者已存在）
+    if (error.response && error.response.status === 409) {
+      try {
+        // 獲取現有患者資料
+        const checkResponse = await checkIdNumber(patientData.id_number);
+        if (checkResponse.exists && checkResponse.patient) {
+          console.log('處理409衝突: 患者已存在，嘗試更新資料');
+          const patientId = checkResponse.patient.id;
+          
+          // 準備更新數據
+          const updateData: PatientUpdateRequest = {
+            chinese_name: patientData.chinese_name,
+            english_name: patientData.english_name,
+            birth_date: patientData.birth_date,
+            phone_number: patientData.phone_number,
+            email: patientData.email,
+            gender: patientData.gender,
+            basic_diseases: patientData.basic_diseases,
+            drug_allergies: patientData.drug_allergies,
+            food_allergies: patientData.food_allergies,
+            note: patientData.note,
+            doctor_id: patientData.doctor_id,
+            data_source: patientData.data_source,
+            region: patientData.region,
+            district: patientData.district,
+            sub_district: patientData.sub_district
+          };
+          
+          // 更新患者資料
+          const updatedPatient = await updatePatient(patientId, updateData);
+          console.log('✅ 成功處理409衝突並更新患者資料:', updatedPatient);
+          return updatedPatient;
+        }
+      } catch (recoveryError) {
+        console.error('恢復409衝突時出錯:', recoveryError);
+        // 如果恢復失敗，繼續拋出原始錯誤
+      }
+    }
 
     // 處理 422 驗證錯誤
     if (error.response && error.response.status === 422) {

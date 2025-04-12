@@ -1295,13 +1295,29 @@ export default function AppointmentsPage() {
                   // 判斷是否是公眾假期
                   const holiday = isHKHoliday(date);
                   
-                  if (isToday) return "date-today";
-                  if (holiday) return "hk-holiday";
+                  if (isToday) {
+                    return "date-today";
+                  }
+                  if (holiday) {
+                    return "hk-holiday";
+                  }
                   return undefined;
                 }}
                 renderDayContents={renderDayContents}
                 weekDayClassName={(day) => "text-center"}
-                formatWeekDay={(nameOfDay) => nameOfDay.substring(0, 1)} // 只顯示一個字
+                formatWeekDay={(nameOfDay) => {
+                  // 將星期幾的名稱轉換為「日 一 二 三 四 五 六」格式
+                  const dayMap: { [key: string]: string } = {
+                    '星期日': '日',
+                    '星期一': '一',
+                    '星期二': '二',
+                    '星期三': '三',
+                    '星期四': '四',
+                    '星期五': '五',
+                    '星期六': '六'
+                  };
+                  return dayMap[nameOfDay] || nameOfDay.substring(0, 1);
+                }}
                 calendarStartDay={0} // 0 表示週日開始
               />
             </div>
