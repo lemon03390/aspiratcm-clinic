@@ -297,7 +297,8 @@ export const diagnosisDataApi = {
   searchModernDiseases: async (query: string) => {
     try {
       console.log(`正在搜尋現代病名: ${query}`);
-      return await apiClientWithRetry('get', `/reference-data/search?type=modern-diseases&q=${encodeURIComponent(query)}`);
+      const response = await apiClientWithRetry('get', `/reference-data/search/modern-diseases?q=${encodeURIComponent(query)}`);
+      return response?.data || [];
     } catch (error) {
       console.error(`搜尋現代病名失敗: ${query}`, error);
       return [];
@@ -308,7 +309,8 @@ export const diagnosisDataApi = {
   searchCMSyndromes: async (query: string) => {
     try {
       console.log(`正在搜尋中醫證候: ${query}`);
-      return await apiClientWithRetry('get', `/reference-data/search?type=cm-syndromes&q=${encodeURIComponent(query)}`);
+      const response = await apiClientWithRetry('get', `/reference-data/search/cm-syndromes?q=${encodeURIComponent(query)}`);
+      return response?.data || [];
     } catch (error) {
       console.error(`搜尋中醫證候失敗: ${query}`, error);
       return [];
@@ -316,12 +318,25 @@ export const diagnosisDataApi = {
   },
   
   // 搜尋中醫治則
-  searchTreatmentPrinciples: async (query: string) => {
+  searchTreatmentRules: async (query: string) => {
     try {
       console.log(`正在搜尋中醫治則: ${query}`);
-      return await apiClientWithRetry('get', `/reference-data/search?type=tcm-principles&q=${encodeURIComponent(query)}`);
+      const response = await apiClientWithRetry('get', `/reference-data/search/tcm-principles?q=${encodeURIComponent(query)}`);
+      return response?.data || [];
     } catch (error) {
       console.error(`搜尋中醫治則失敗: ${query}`, error);
+      return [];
+    }
+  },
+  
+  // 搜尋中藥
+  searchMedicines: async (query: string) => {
+    try {
+      console.log(`正在搜尋中藥: ${query}`);
+      const response = await apiClientWithRetry('get', `/reference-data/search/medicine?q=${encodeURIComponent(query)}`);
+      return response?.data || [];
+    } catch (error) {
+      console.error(`搜尋中藥失敗: ${query}`, error);
       return [];
     }
   }

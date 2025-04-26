@@ -1,11 +1,11 @@
 from typing import Callable
 from functools import wraps
-from fastapi import HTTPException, APIRouter, Depends
+from fastapi import HTTPException, APIRouter, Depends, Query, Path
 import logging
 from contextlib import contextmanager
 from sqlalchemy.orm import Session
 from app.api.appointments import build_appointment_dict
-from app.db.database import get_db
+from app.db.session import get_db
 import asyncio
 from sqlalchemy import text
 

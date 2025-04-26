@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { diagnosisDataApi } from './api';
+import { useEffect, useState } from 'react';
+import { diagnosisDataApi, referenceDataApi } from './api';
 
 interface ReferenceDataState {
   modernDiseases: { code: string; name: string }[];
@@ -108,6 +108,22 @@ export const useReferenceData = () => {
     }
   };
 
+  // 新增: 模糊搜尋參考數據
+  const searchReferenceData = async (dataType: string, query: string) => {
+    if (!query || query.length < 2) {
+      return [];
+    }
+    
+    try {
+      console.log(`正在搜尋 ${dataType}，關鍵字: ${query}`);
+      const results = await referenceDataApi.search(dataType, query);
+      return Array.isArray(results.data) ? results.data : [];
+    } catch (error) {
+      console.error(`搜尋 ${dataType} 失敗:`, error);
+      return [];
+    }
+  };
+
   // 初始載入所有參考數據
   useEffect(() => {
     loadAllReferenceData();
@@ -118,7 +134,8 @@ export const useReferenceData = () => {
     loadAllReferenceData,
     loadModernDiseases,
     loadCmSyndromes,
-    loadTcmPrinciples
+    loadTcmPrinciples,
+    searchReferenceData
   };
 };
 

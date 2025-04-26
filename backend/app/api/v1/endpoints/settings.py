@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy.orm import Session
 import logging
 
-from app.db.database import get_db
+from app.db.session import get_db
 from app.models.setting import TcmSetting
 from app.schemas.setting import (
     TcmSettingCreate, 

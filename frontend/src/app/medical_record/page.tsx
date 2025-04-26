@@ -69,9 +69,9 @@ export default function MedicalRecordPage() {
     presentIllness: '',
     observation: {},
     diagnosis: {
-      modernDiseases: [] as { code: string, name: string }[],
-      cmSyndromes: [] as { code: string, name: string }[],
-      cmPrinciple: [] as { code: string, name: string }[]
+      modernDiseases: [] as string[],
+      cmSyndromes: [] as string[],
+      cmPrinciple: ''
     },
     prescription: [] as { name: string; amount: string; id: string; code: string }[],
     treatmentMethods: [] as string[]
@@ -90,7 +90,7 @@ export default function MedicalRecordPage() {
         diagnosis: {
           modernDiseases: [],
           cmSyndromes: [],
-          cmPrinciple: []
+          cmPrinciple: ''
         },
         prescription: [],
         treatmentMethods: []
@@ -287,12 +287,19 @@ export default function MedicalRecordPage() {
     cmSyndromes: { code: string, name: string }[]; 
     cmPrinciple: { code: string, name: string }[] 
   }) => {
+    // 安全處理 data，避免 undefined 或 null
+    const safeData = {
+      modernDiseases: Array.isArray(data.modernDiseases) ? data.modernDiseases : [],
+      cmSyndromes: Array.isArray(data.cmSyndromes) ? data.cmSyndromes : [],
+      cmPrinciple: Array.isArray(data.cmPrinciple) ? data.cmPrinciple : []
+    };
+
     setFormData(prev => ({
       ...prev,
       diagnosis: {
-        modernDiseases: data.modernDiseases,
-        cmSyndromes: data.cmSyndromes,
-        cmPrinciple: data.cmPrinciple
+        modernDiseases: safeData.modernDiseases.map(d => d.name || ''),
+        cmSyndromes: safeData.cmSyndromes.map(d => d.name || ''),
+        cmPrinciple: safeData.cmPrinciple.map(d => d.name || '').join('、') || ''
       }
     }));
     console.log('已更新中醫診斷:', data);
@@ -346,11 +353,11 @@ export default function MedicalRecordPage() {
       // 將結構化的診斷數據轉換為字符串，同時保留原始結構
       const diagnosisText = [
         formData.diagnosis.modernDiseases.length > 0 ? 
-          `現代病名: ${formData.diagnosis.modernDiseases.map(d => d.name).join('、')}` : '',
+          `現代病名: ${formData.diagnosis.modernDiseases.join('、')}` : '',
         formData.diagnosis.cmSyndromes.length > 0 ? 
-          `中醫辨證: ${formData.diagnosis.cmSyndromes.map(d => d.name).join('、')}` : '',
-        formData.diagnosis.cmPrinciple.length > 0 ? 
-          `中醫治則: ${formData.diagnosis.cmPrinciple.map(d => d.name).join('、')}` : ''
+          `中醫辨證: ${formData.diagnosis.cmSyndromes.join('、')}` : '',
+        formData.diagnosis.cmPrinciple ? 
+          `中醫治則: ${formData.diagnosis.cmPrinciple}` : ''
       ].filter(Boolean).join('；');
       
       // 收集所有表單數據
@@ -362,9 +369,9 @@ export default function MedicalRecordPage() {
         observation: formData.observation,
         diagnosis: diagnosisText || '無診斷',
         diagnosis_structured: {
-          modernDiseases: formData.diagnosis.modernDiseases,
-          cmSyndromes: formData.diagnosis.cmSyndromes,
-          cmPrinciple: formData.diagnosis.cmPrinciple
+          modernDiseases: formData.diagnosis.modernDiseases.map(name => ({ name })),
+          cmSyndromes: formData.diagnosis.cmSyndromes.map(name => ({ name })),
+          cmPrinciple: formData.diagnosis.cmPrinciple ? [{ name: formData.diagnosis.cmPrinciple }] : []
         },
         prescription: formData.prescription.map(herb => `${herb.name} ${herb.amount}`).join('、'),
         treatment_methods: formData.treatmentMethods
@@ -524,6 +531,17 @@ export default function MedicalRecordPage() {
               currentPatientId={currentPatientId}
               onRefresh={handleRefreshWaitingList}
             />
+            
+            {/* 過往病歷區 - 移至左側適當位置 */}
+            {currentPatient && (
+              <div className="mt-6">
+                <PastRecordList
+                  records={pastRecords}
+                  onViewRecord={handleViewPastRecord}
+                  patientName={currentPatient?.chinese_name}
+                />
+              </div>
+            )}
           </div>
           
           {/* 右側診療區 */}
@@ -565,8 +583,8 @@ export default function MedicalRecordPage() {
                 
                 {/* AI 用藥建議 */}
                 <AiHerbSuggestions 
-                  modernDiagnosis={formData.diagnosis.modernDiseases.map(d => d.name)}
-                  cmSyndrome={formData.diagnosis.cmSyndromes.map(d => d.name)}
+                  modernDiagnosis={formData.diagnosis.modernDiseases}
+                  cmSyndrome={formData.diagnosis.cmSyndromes}
                   onAddHerb={handleAddHerbFromAi}
                 />
                 
@@ -602,15 +620,6 @@ export default function MedicalRecordPage() {
                 )}
               </div>
             )}
-          </div>
-          
-          {/* 右側過往病歷區 */}
-          <div className="col-span-12 md:col-span-3">
-            <PastRecordList
-              records={pastRecords}
-              onViewRecord={handleViewPastRecord}
-              patientName={currentPatient?.chinese_name}
-            />
           </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
-import FuzzySearchInput from './FuzzySearchInput';
-import { debounce } from 'lodash';
+import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react';
+import { diagnosisDataApi } from '../utils/api';
+import AsyncSelect, { SelectOption } from './AsyncSelect';
 
 // 中藥數據接口
 interface Herb {
@@ -72,7 +72,6 @@ const HerbalPrescriptionForm = forwardRef<
   });
   const [herbOptions, setHerbOptions] = useState<Herb[]>([]);
   const [searchLoading, setSearchLoading] = useState<boolean>(false);
-  const [searchTerm, setSearchTerm] = useState<string>('');
   const [inventoryStatus, setInventoryStatus] = useState<Record<string, InventoryCheckResult>>({});
   const [showPriceInfo, setShowPriceInfo] = useState<boolean>(false);
   
@@ -91,42 +90,29 @@ const HerbalPrescriptionForm = forwardRef<
     }, 0);
   }, [prescription.herbs]);
   
-  // 延遲搜尋，避免頻繁API請求
-  const debouncedSearch = useMemo(
-    () =>
-      debounce(async (term: string) => {
-        if (!term || term.length < 1) {
-          setHerbOptions([]);
-          return;
-        }
-        
-        setSearchLoading(true);
-        try {
-          const response = await fetch(`/api/v1/herbs?search=${encodeURIComponent(term)}`);
-          if (response.ok) {
-            const data = await response.json();
-            setHerbOptions(data.items || []);
-          } else {
-            console.error('Failed to fetch herbs');
-            setHerbOptions([]);
-          }
-        } catch (error) {
-          console.error('Error fetching herbs:', error);
-          setHerbOptions([]);
-        } finally {
-          setSearchLoading(false);
-        }
-      }, 300),
-    []
-  );
-  
-  // 監聽搜尋詞變化
-  useEffect(() => {
-    debouncedSearch(searchTerm);
-    return () => {
-      debouncedSearch.cancel();
-    };
-  }, [searchTerm, debouncedSearch]);
+  // 搜尋中藥名稱
+  const searchMedicines = async (searchTerm: string): Promise<SelectOption[]> => {
+    if (!searchTerm || searchTerm.length < 1) {
+      return [];
+    }
+    
+    setSearchLoading(true);
+    try {
+      const results = await diagnosisDataApi.searchMedicines(searchTerm);
+      
+      // 將搜尋結果轉換為選項格式，只顯示中文名稱
+      return results.map(med => ({
+        label: med.name, // 只顯示中文名稱
+        value: med.code,
+        data: med
+      }));
+    } catch (error) {
+      console.error('搜尋中藥失敗:', error);
+      return [];
+    } finally {
+      setSearchLoading(false);
+    }
+  };
   
   // 檢查庫存狀態
   const checkInventory = async (herbCode: string, requiredAmount: number) => {
@@ -182,21 +168,32 @@ const HerbalPrescriptionForm = forwardRef<
     }));
   };
   
-  // 處理藥材選擇
-  const handleHerbSelect = (id: string, herb: Herb) => {
+  // 處理中藥選擇
+  const handleHerbSelection = (id: string, selectedItems: SelectOption[]) => {
+    if (selectedItems.length === 0) {
+      return;
+    }
+    
+    const selectedOption = selectedItems[0];
+    const herbData = selectedOption.data;
+    
+    if (!herbData) {
+      return;
+    }
+    
     setPrescription(prev => ({
       ...prev,
       herbs: prev.herbs.map(item => 
         item.id === id ? { 
           ...item, 
-          name: herb.name,
-          code: herb.code,
-          brand: herb.brand,
-          is_compound: herb.is_compound,
-          unit: herb.unit,
-          price: herb.price,
-          quantity_per_bottle: herb.quantity_per_bottle,
-          currency: herb.currency,
+          name: herbData.name,
+          code: herbData.code,
+          brand: herbData.brand,
+          is_compound: herbData.is_compound,
+          unit: herbData.unit,
+          price: herbData.price,
+          quantity_per_bottle: herbData.quantity_per_bottle,
+          currency: herbData.currency,
           source: item.source || 'manual', // 保持現有來源，或設為 manual
         } : item
       )
@@ -273,16 +270,6 @@ const HerbalPrescriptionForm = forwardRef<
     onSave(prescription);
   };
   
-  // 處理藥材名稱搜尋
-  const handleHerbSearch = (term: string) => {
-    setSearchTerm(term);
-    return herbOptions.map(herb => ({
-      key: herb.code,
-      value: `${herb.code} ${herb.name}${herb.is_compound ? ' (複方)' : ''}`,
-      originalObject: herb
-    }));
-  };
-  
   // 暴露方法給父組件
   useImperativeHandle(ref, () => ({
     addHerb: (herbData: any) => {
@@ -305,6 +292,19 @@ const HerbalPrescriptionForm = forwardRef<
       }));
     }
   }));
+  
+  // 將藥物項目轉換為 AsyncSelect 選項
+  const getSelectedOption = (herb: HerbItem): SelectOption[] => {
+    if (!herb.name || !herb.code) {
+      return [];
+    }
+    
+    return [{
+      label: herb.name,
+      value: herb.code,
+      data: herb
+    }];
+  };
   
   return (
     <div className="bg-white p-4 rounded-md shadow">
@@ -336,17 +336,14 @@ const HerbalPrescriptionForm = forwardRef<
                     {isAiSuggested && (
                       <span className="mr-1 text-xs bg-green-100 text-green-800 px-1 py-0.5 rounded">AI</span>
                     )}
-                    <FuzzySearchInput
-                      placeholder="搜尋中藥名稱/代碼"
-                      onSearch={handleHerbSearch}
-                      isLoading={searchLoading}
-                      onSelect={(value, option) => {
-                        if (option?.originalObject) {
-                          handleHerbSelect(herb.id, option.originalObject);
-                        }
-                      }}
-                      defaultValue={herb.name ? `${herb.code} ${herb.name}${herb.is_compound ? ' (複方)' : ''}` : ''}
+                    <AsyncSelect
+                      placeholder="搜尋中藥名稱"
+                      loadOptions={searchMedicines}
+                      onChange={(selectedItems) => handleHerbSelection(herb.id, selectedItems)}
+                      value={getSelectedOption(herb)}
+                      multiple={false}
                       className="w-full"
+                      disabled={false}
                     />
                   </div>
                   <div className="col-span-2 pr-2">
