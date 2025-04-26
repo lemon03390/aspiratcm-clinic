@@ -112,7 +112,7 @@ export const medicalRecordApi = {
   getPatientRecords: async (patientId: number) => {
     try {
       console.log('正在獲取患者病歷，患者ID:', patientId);
-      return await apiClientWithRetry('get', `/medical_records/patient/${patientId}`);
+      return await apiClientWithRetry('get', `/medical-records/by-patient/${patientId}`);
     } catch (error) {
       console.error(`獲取患者病歷失敗，患者ID: ${patientId}:`, error);
       throw error;
@@ -123,7 +123,7 @@ export const medicalRecordApi = {
   getRecordById: async (recordId: string) => {
     try {
       console.log('正在獲取病歷詳情，記錄ID:', recordId);
-      return await apiClientWithRetry('get', `/medical_records/${recordId}`);
+      return await apiClientWithRetry('get', `/medical-records/${recordId}`);
     } catch (error) {
       console.error(`獲取病歷詳情失敗，記錄ID: ${recordId}:`, error);
       throw error;
@@ -134,7 +134,7 @@ export const medicalRecordApi = {
   createRecord: async (recordData: any) => {
     try {
       console.log('正在創建病歷:', recordData);
-      return await apiClientWithRetry('post', '/medical_records', recordData);
+      return await apiClientWithRetry('post', '/medical-records', recordData);
     } catch (error) {
       console.error('創建病歷失敗:', error);
       throw error;
@@ -145,7 +145,7 @@ export const medicalRecordApi = {
   updateRecord: async (recordId: string, recordData: any) => {
     try {
       console.log(`正在更新病歷，記錄ID: ${recordId}:`, recordData);
-      return await apiClientWithRetry('put', `/medical_records/${recordId}`, recordData);
+      return await apiClientWithRetry('put', `/medical-records/${recordId}`, recordData);
     } catch (error) {
       console.error(`更新病歷失敗，記錄ID: ${recordId}:`, error);
       throw error;
@@ -252,10 +252,86 @@ export const appointmentApi = {
   },
 };
 
+// 診斷資料API
+export const diagnosisDataApi = {
+  // 獲取所有現代病名
+  getAllModernDiseases: async () => {
+    try {
+      console.log('正在獲取所有現代病名資料');
+      const response = await apiClientWithRetry('get', '/reference-data/modern-diseases');
+      return response?.data || [];
+    } catch (error) {
+      console.error('獲取現代病名資料失敗:', error);
+      // 如果API調用失敗，返回空陣列避免UI崩潰
+      return [];
+    }
+  },
+
+  // 獲取所有中醫證候
+  getAllCMSyndromes: async () => {
+    try {
+      console.log('正在獲取所有中醫證候資料');
+      const response = await apiClientWithRetry('get', '/reference-data/cm-syndromes');
+      return response?.data || [];
+    } catch (error) {
+      console.error('獲取中醫證候資料失敗:', error);
+      // 如果API調用失敗，返回空陣列避免UI崩潰
+      return [];
+    }
+  },
+
+  // 獲取所有中醫治則
+  getAllTreatmentPrinciples: async () => {
+    try {
+      console.log('正在獲取所有中醫治則資料');
+      const response = await apiClientWithRetry('get', '/reference-data/tcm-principles');
+      return response?.data || [];
+    } catch (error) {
+      console.error('獲取中醫治則資料失敗:', error);
+      // 如果API調用失敗，返回空陣列避免UI崩潰
+      return [];
+    }
+  },
+  
+  // 搜尋現代病名
+  searchModernDiseases: async (query: string) => {
+    try {
+      console.log(`正在搜尋現代病名: ${query}`);
+      return await apiClientWithRetry('get', `/reference-data/search?type=modern-diseases&q=${encodeURIComponent(query)}`);
+    } catch (error) {
+      console.error(`搜尋現代病名失敗: ${query}`, error);
+      return [];
+    }
+  },
+  
+  // 搜尋中醫證候
+  searchCMSyndromes: async (query: string) => {
+    try {
+      console.log(`正在搜尋中醫證候: ${query}`);
+      return await apiClientWithRetry('get', `/reference-data/search?type=cm-syndromes&q=${encodeURIComponent(query)}`);
+    } catch (error) {
+      console.error(`搜尋中醫證候失敗: ${query}`, error);
+      return [];
+    }
+  },
+  
+  // 搜尋中醫治則
+  searchTreatmentPrinciples: async (query: string) => {
+    try {
+      console.log(`正在搜尋中醫治則: ${query}`);
+      return await apiClientWithRetry('get', `/reference-data/search?type=tcm-principles&q=${encodeURIComponent(query)}`);
+    } catch (error) {
+      console.error(`搜尋中醫治則失敗: ${query}`, error);
+      return [];
+    }
+  }
+};
+
 // 統一導出
 export default {
   referenceData: referenceDataApi,
   medicalRecord: medicalRecordApi,
   patient: patientApi,
-  appointment: appointmentApi
+  appointment: appointmentApi,
+  diagnosisData: diagnosisDataApi
 }; 

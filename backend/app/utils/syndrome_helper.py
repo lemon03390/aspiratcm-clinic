@@ -56,14 +56,7 @@ def get_syndrome_name(code: str) -> str:
 def get_syndrome_aliases(name: str) -> List[str]:
     """根據標準名稱獲取所有別名"""
     data = get_syndrome_data()
-    aliases = []
-    
-    # 反向尋找別名
-    for alias, std_name in data["alias_to_name"].items():
-        if std_name == name:
-            aliases.append(alias)
-    
-    return aliases
+    return [alias for alias, std_name in data["alias_to_name"].items() if std_name == name]
 
 def get_syndrome_info(code: str) -> Dict[str, Any]:
     """獲取完整的證候信息，包括代碼、標準名稱和別名"""

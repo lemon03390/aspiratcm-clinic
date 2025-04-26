@@ -7,7 +7,7 @@ import json
 import logging
 import asyncio
 
-from app.db.database import get_db
+from app.db.session import get_db
 from app.api.appointments import parse_consultation_type
 
 # 設置日誌

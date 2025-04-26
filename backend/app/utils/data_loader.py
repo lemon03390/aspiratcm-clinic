@@ -3,7 +3,7 @@ import os
 import logging
 from sqlalchemy.orm import Session
 from app.models.medical_record import ReferenceData
-from app.database import db_session
+from app.db.session import db_session
 
 logger = logging.getLogger(__name__)
 

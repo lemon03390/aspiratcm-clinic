@@ -24,6 +24,8 @@ class HerbItemCreate(BaseModel):
     amount: str
     unit: Optional[str] = "g"
     sequence: Optional[int] = 0
+    source: Optional[str] = "manual"
+    structured_data: Optional[Dict[str, Any]] = None
 
 
 class PrescriptionCreate(BaseModel):
@@ -69,6 +71,8 @@ class HerbItemResponse(BaseModel):
     amount: str
     unit: str
     sequence: int
+    source: Optional[str] = "manual"
+    structured_data: Optional[Dict[str, Any]] = None
 
     class Config:
         from_attributes = True
@@ -185,7 +189,9 @@ def create_medical_record(medical_record: MedicalRecordCreate, db: Session = Dep
                     herb_name=item.herb_name,
                     amount=item.amount,
                     unit=item.unit,
-                    sequence=item.sequence
+                    sequence=item.sequence,
+                    source=item.source,
+                    structured_data=item.structured_data
                 )
                 db.add(herb_item)
 
@@ -392,7 +398,9 @@ def update_medical_record(
                             herb_name=herb_data.get('herb_name'),
                             amount=herb_data.get('amount'),
                             unit=herb_data.get('unit', 'g'),
-                            sequence=herb_data.get('sequence', idx)
+                            sequence=herb_data.get('sequence', idx),
+                            source=herb_data.get('source', 'manual'),
+                            structured_data=herb_data.get('structured_data')
                         )
                         db.add(herb_item)
             else:
@@ -412,7 +420,9 @@ def update_medical_record(
                             herb_name=herb_data.get('herb_name'),
                             amount=herb_data.get('amount'),
                             unit=herb_data.get('unit', 'g'),
-                            sequence=herb_data.get('sequence', idx)
+                            sequence=herb_data.get('sequence', idx),
+                            source=herb_data.get('source', 'manual'),
+                            structured_data=herb_data.get('structured_data')
                         )
                         db.add(herb_item)
         
@@ -476,4 +486,36 @@ def update_medical_record(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"更新醫療記錄失敗: {str(e)}"
-        ) 
+        )
+
+
+@router.get("/by-patient/{patient_id}", response_model=List[MedicalRecordResponse])
+def get_medical_records_by_patient(
+    patient_id: int, 
+    limit: int = Query(20, description="每頁記錄數"),
+    offset: int = Query(0, description="跳過的記錄數"),
+    db: Session = Depends(get_db)
+):
+    """獲取指定患者的醫療記錄"""
+    records = db.query(MedicalRecord).filter(
+        MedicalRecord.patient_id == patient_id
+    ).order_by(
+        MedicalRecord.visit_date.desc()
+    ).offset(offset).limit(limit).all()
+    
+    # 為診斷資料添加證候詳細資訊
+    for record in records:
+        if record.diagnoses and record.diagnoses[0].cm_syndromes:
+            # 取得最新的診斷
+            diagnosis = record.diagnoses[0]
+            
+            # 將 cm_syndromes 列表轉換為完整的證候資訊
+            syndrome_info_list = [
+                SyndromeInfo(**get_syndrome_info(code))
+                for code in diagnosis.cm_syndromes if code
+            ]
+            
+            # 在不修改 DB 模型的情況下附加這個資訊
+            setattr(diagnosis, 'cm_syndromes_info', syndrome_info_list)
+    
+    return records 

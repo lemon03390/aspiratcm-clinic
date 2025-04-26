@@ -1,21 +1,27 @@
 [
   {
+    "code": "B01.",
+    "name": "八綱症候",
+    "aliases": [],
+    "parent": null
+  },
+  {
     "code": "B01.01.",
     "name": "陰症",
     "aliases": [],
-    "parent": "null"
+    "parent": "B01."
   },
   {
     "code": "B01.02.",
     "name": "陽症",
     "aliases": [],
-    "parent": "null"
+    "parent": "B01."
   },
   {
     "code": "B01.03.",
     "name": "表症",
     "aliases": [],
-    "parent": "null"
+    "parent": "B01."
   },
   {
     "code": "B01.03.01",
@@ -39,7 +45,7 @@
     "code": "B01.04.",
     "name": "裡症",
     "aliases": [],
-    "parent": "null"
+    "parent": "B01."
   },
   {
     "code": "B01.04.01",
@@ -57,7 +63,7 @@
     "code": "B01.05.",
     "name": "寒症",
     "aliases": [],
-    "parent": "null"
+    "parent": "B01."
   },
   {
     "code": "B01.05.01",
@@ -77,7 +83,7 @@
     "code": "B01.06.",
     "name": "熱症",
     "aliases": [],
-    "parent": "null"
+    "parent": "B01."
   },
   {
     "code": "B01.06.01",
@@ -116,7 +122,7 @@
     "code": "B01.07.",
     "name": "虛症",
     "aliases": [],
-    "parent": "null"
+    "parent": "B01."
   },
   {
     "code": "B01.07.01",
@@ -150,7 +156,7 @@
     "code": "B01.08.",
     "name": "實症",
     "aliases": [],
-    "parent": "null"
+    "parent": "B01."
   },
   {
     "code": "B01.08.01",
@@ -170,7 +176,7 @@
     "aliases": [
       "虛實錯雜症"
     ],
-    "parent": "null"
+    "parent": "B01."
   },
   {
     "code": "B01.09.01",
@@ -204,7 +210,7 @@
     "aliases": [
       "寒熱夾雜症"
     ],
-    "parent": "null"
+    "parent": "B01."
   },
   {
     "code": "B01.10.01",
@@ -263,10 +269,16 @@
     "parent": "B01.10."
   },
   {
+    "code": "B02.",
+    "name": "病因症候",
+    "aliases": [],
+    "parent": null
+  },
+  {
     "code": "B02.01.",
     "name": "邪症類",
     "aliases": [],
-    "parent": "null"
+    "parent": "B02."
   },
   {
     "code": "B02.01.01",
@@ -622,7 +634,7 @@
     "aliases": [
       "風邪偏盛症"
     ],
-    "parent": "null"
+    "parent": "B02."
   },
   {
     "code": "B02.02.01",
@@ -1226,7 +1238,7 @@
     "code": "B02.02.06",
     "name": "風濕症",
     "aliases": [],
-    "parent": "B02.02"
+    "parent": "B02.02."
   },
   {
     "code": "B02.02.06.01",
@@ -1361,7 +1373,7 @@
     "parent": "B02.02.06.03.02"
   },
   {
-    "code": "B02.02.07.",
+    "code": "B02.02.07",
     "name": "風水症",
     "aliases": [
       "風襲水停症"
@@ -1575,7 +1587,7 @@
     "aliases": [
       "寒邪偏盛症"
     ],
-    "parent": "null"
+    "parent": "B02."
   },
   {
     "code": "B02.03.01",
@@ -1954,7 +1966,7 @@
     "aliases": [
       "暑邪偏盛症"
     ],
-    "parent": "null"
+    "parent": "B02."
   },
   {
     "code": "B02.04.01",
@@ -2190,7 +2202,7 @@
     "aliases": [
       "濕邪偏盛症"
     ],
-    "parent": "B02.05."
+    "parent": "B02."
   },
   {
     "code": "B02.05.01",
@@ -2199,14 +2211,14 @@
     "parent": "B02.05."
   },
   {
-    "code": "B02.05.01.01.",
+    "code": "B02.05.01.01",
     "name": "濕邪外感症",
     "aliases": [
       "表濕症",
       "外感濕邪症",
       "外濕症"
     ],
-    "parent": "B02.05.01.01"
+    "parent": "B02.05.01"
   },
   {
     "code": "B02.05.01.01.01",
@@ -2276,7 +2288,7 @@
     "parent": "B02.05.01.01"
   },
   {
-    "code": "B02.05.01.02.",
+    "code": "B02.05.01.02",
     "name": "濕邪內蘊症",
     "aliases": [
       "內濕症",
@@ -2802,7 +2814,7 @@
     "aliases": [
       "燥邪偏盛症"
     ],
-    "parent": "null"
+    "parent": "B02."
   },
   {
     "code": "B02.06.01",
@@ -2816,7 +2828,7 @@
     "code": "B02.06.02",
     "name": "內燥症",
     "aliases": [],
-    "parent": "B02.06"
+    "parent": "B02.06."
   },
   {
     "code": "B02.06.03",
@@ -2946,7 +2958,7 @@
     "aliases": [
       "火邪偏盛症"
     ],
-    "parent": "null"
+    "parent": "B02."
   },
   {
     "code": "B02.07.01",
@@ -3393,7 +3405,7 @@
     "code": "B02.08.",
     "name": "毒症類",
     "aliases": [],
-    "parent": "B02.08."
+    "parent": "B02."
   },
   {
     "code": "B02.08.01",
@@ -3790,13 +3802,13 @@
     "parent": "B02.08.07.01"
   },
   {
-    "code": "B02.08.07.02.",
+    "code": "B02.08.07.02",
     "name": "火熱邪毒壅盛症",
     "aliases": [
       "熱毒壅盛症",
       "火毒壅盛症"
     ],
-    "parent": "B02.08.07.02"
+    "parent": "B02.08.07"
   },
   {
     "code": "B02.08.07.02.01",
@@ -4022,13 +4034,13 @@
     "parent": "B02.08.07.03.05"
   },
   {
-    "code": "B02.08.07.04.",
+    "code": "B02.08.07.04",
     "name": "火毒上攻症",
     "aliases": [
       "熱毒上犯症",
       "熱毒上攻症"
     ],
-    "parent": "B02.08.07.04"
+    "parent": "B02.08.07"
   },
   {
     "code": "B02.08.07.04.01",
@@ -4525,7 +4537,7 @@
     "code": "B02.09.",
     "name": "痰飲症類",
     "aliases": [],
-    "parent": "null"
+    "parent": "B02."
   },
   {
     "code": "B02.09.01",
@@ -4898,10 +4910,10 @@
     "parent": "B02.09.03.02.04"
   },
   {
-    "code": "B02.09.03.03.",
+    "code": "B02.09.03.03",
     "name": "痰濕兼夾症",
     "aliases": [],
-    "parent": "B02.09.03.03"
+    "parent": "B02.09.03"
   },
   {
     "code": "B02.09.03.03.01",
@@ -5110,10 +5122,10 @@
     "parent": "B02.09.04.02.04"
   },
   {
-    "code": "B02.09.04.03.",
+    "code": "B02.09.04.03",
     "name": "痰濁兼夾症",
     "aliases": [],
-    "parent": "B02.09.04.03"
+    "parent": "B02.09.04"
   },
   {
     "code": "B02.09.04.03.01",
@@ -5136,18 +5148,18 @@
     "parent": "B02.09.04.03.02"
   },
   {
-    "code": "B02.09.05.",
+    "code": "B02.09.05",
     "name": "痰熱症",
     "aliases": [
       "痰熱壅盛症"
     ],
-    "parent": "B02.09.05"
+    "parent": "B02.09."
   },
   {
-    "code": "B02.09.05.01.",
+    "code": "B02.09.05.01",
     "name": "痰熱搏結症",
     "aliases": [],
-    "parent": "B02.09.05.01"
+    "parent": "B02.09.05"
   },
   {
     "code": "B02.09.05.01.01",
@@ -5420,7 +5432,7 @@
     "code": "B02.09.08",
     "name": "痰閉症",
     "aliases": [],
-    "parent": "B02.09"
+    "parent": "B02.09."
   },
   {
     "code": "B02.09.08.01",
@@ -5558,7 +5570,7 @@
     "code": "B02.10.",
     "name": "瘀血症類",
     "aliases": [],
-    "parent": "null"
+    "parent": "B02."
   },
   {
     "code": "B02.10.01",
@@ -5923,7 +5935,7 @@
     "aliases": [
       "情志失調症"
     ],
-    "parent": "null"
+    "parent": "B02."
   },
   {
     "code": "B02.11.01",
@@ -5986,10 +5998,10 @@
     "parent": "B02.11."
   },
   {
-    "code": "B02.11.06.",
+    "code": "B02.11.06",
     "name": "驚恐症",
     "aliases": [],
-    "parent": "B02.11.06"
+    "parent": "B02.11."
   },
   {
     "code": "B02.11.06.01",
@@ -6032,7 +6044,7 @@
     "code": "B02.12.",
     "name": "飲食症類",
     "aliases": [],
-    "parent": "null"
+    "parent": "B02."
   },
   {
     "code": "B02.12.01",
@@ -6200,7 +6212,7 @@
     "code": "B02.13.",
     "name": "結石症類",
     "aliases": [],
-    "parent": "null"
+    "parent": "B02."
   },
   {
     "code": "B02.13.01",
@@ -6221,7 +6233,7 @@
     "code": "B02.14.",
     "name": "蟲症類",
     "aliases": [],
-    "parent": "null"
+    "parent": "B02."
   },
   {
     "code": "B02.14.01",
@@ -6330,7 +6342,7 @@
     "aliases": [
       "外傷症"
     ],
-    "parent": "null"
+    "parent": "B02."
   },
   {
     "code": "B02.15.01",
@@ -6480,10 +6492,16 @@
     "parent": "B02.15."
   },
   {
+    "code": "B03.",
+    "name": "氣血陰陽精髓津液症類",
+    "aliases": [],
+    "parent": null
+  },
+  {
     "code": "B03.01.",
     "name": "氣症類",
     "aliases": [],
-    "parent": "null"
+    "parent": "B03."
   },
   {
     "code": "B03.01.01",
@@ -7060,10 +7078,10 @@
     "parent": "B03.01.03.06.02"
   },
   {
-    "code": "B03.01.04.",
+    "code": "B03.01.04",
     "name": "氣血兩虛症",
     "aliases": [],
-    "parent": "B03.01.04"
+    "parent": "B03.01."
   },
   {
     "code": "B03.01.04.01",
@@ -7184,7 +7202,7 @@
     "code": "B03.02.",
     "name": "血症類",
     "aliases": [],
-    "parent": "null"
+    "parent": "B03."
   },
   {
     "code": "B03.02.01",
@@ -7709,10 +7727,10 @@
     "code": "B03.03.",
     "name": "陰症類",
     "aliases": [],
-    "parent": "null"
+    "parent": "B03."
   },
   {
-    "code": "B03.03.01.",
+    "code": "B03.03.01",
     "name": "陰寒症",
     "aliases": [],
     "parent": "B03.03."
@@ -8053,7 +8071,7 @@
   {
     "code": "B03.03.03.05.09",
     "name": "陰虛火旺症",
-    "aliases":  [
+    "aliases": [
       "陰虛火動症"
     ],
     "parent": "B03.03.03.05"
@@ -8143,7 +8161,7 @@
     "code": "B03.04.",
     "name": "陽症類",
     "aliases": [],
-    "parent": "null"
+    "parent": "B03."
   },
   {
     "code": "B03.04.01",
@@ -8246,13 +8264,13 @@
     "parent": "B03.04.02.02"
   },
   {
-    "code": "B03.04.02.03.",
+    "code": "B03.04.02.03",
     "name": "虛陽外越症",
     "aliases": [
       "虛陽浮越症",
       "虛陽上浮症"
     ],
-    "parent": "B03.04.02.03"
+    "parent": "B03.04.02"
   },
   {
     "code": "B03.04.02.03.01",
@@ -8387,7 +8405,7 @@
     "code": "B03.05.",
     "name": "精髓症類",
     "aliases": [],
-    "parent": "null"
+    "parent": "B03."
   },
   {
     "code": "B03.05.01",
@@ -8464,7 +8482,7 @@
     "code": "B03.06.",
     "name": "津液症類",
     "aliases": [],
-    "parent": "null"
+    "parent": "B03."
   },
   {
     "code": "B03.06.01",
@@ -8554,10 +8572,16 @@
     "parent": "B03.06.03"
   },
   {
+    "code": "B04.",
+    "name": "臟腑官竅症候",
+    "aliases": [],
+    "parent": null
+  },
+  {
     "code": "B04.01.",
     "name": "心系症類",
     "aliases": [],
-    "parent": "null"
+    "parent": "B04."
   },
   {
     "code": "B04.01.01",
@@ -8935,7 +8959,7 @@
     "code": "B04.01.02",
     "name": "小腸症類",
     "aliases": [],
-    "parent": "B04.01"
+    "parent": "B04.01."
   },
   {
     "code": "B04.01.02.01",
@@ -8961,7 +8985,7 @@
     "code": "B04.02.",
     "name": "肝系症類",
     "aliases": [],
-    "parent": "null"
+    "parent": "B04."
   },
   {
     "code": "B04.02.01",
@@ -9565,7 +9589,7 @@
     "code": "B04.02.02.03",
     "name": "膽實症",
     "aliases": [],
-    "parent": "B04.02.02."
+    "parent": "B04.02.02"
   },
   {
     "code": "B04.02.02.03.01",
@@ -9597,7 +9621,7 @@
     "code": "B04.03.",
     "name": "脾系症類",
     "aliases": [],
-    "parent": "null"
+    "parent": "B04."
   },
   {
     "code": "B04.03.01",
@@ -9606,7 +9630,7 @@
     "parent": "B04.03."
   },
   {
-    "code": "B04.03.01.01.",
+    "code": "B04.03.01.01",
     "name": "脾寒症",
     "aliases": [],
     "parent": "B04.03.01"
@@ -10210,7 +10234,7 @@
     "code": "B04.04.",
     "name": "肺系症類",
     "aliases": [],
-    "parent": "null"
+    "parent": "B04."
   },
   {
     "code": "B04.04.01",
@@ -10678,13 +10702,13 @@
     "code": "B04.05.",
     "name": "腎系症類",
     "aliases": [],
-    "parent": "null"
+    "parent": "B04."
   },
   {
     "code": "B04.05.01",
     "name": "腎症類",
     "aliases": [],
-    "parent": "B04.05"
+    "parent": "B04.05."
   },
   {
     "code": "B04.05.01.01",
@@ -11142,7 +11166,7 @@
     "code": "B04.06.",
     "name": "臟腑相兼症類",
     "aliases": [],
-    "parent": "null"
+    "parent": "B04."
   },
   {
     "code": "B04.06.01",
@@ -12475,7 +12499,7 @@
     "code": "B04.07.",
     "name": "官竅症類",
     "aliases": [],
-    "parent": "null"
+    "parent": "B04."
   },
   {
     "code": "B04.07.01",
@@ -12935,7 +12959,7 @@
     "code": "B04.08.",
     "name": "乳房症類",
     "aliases": [],
-    "parent": "null"
+    "parent": "B04."
   },
   {
     "code": "B04.08.01",
@@ -12961,7 +12985,7 @@
     "code": "B04.09.",
     "name": "精室症類",
     "aliases": [],
-    "parent": "null"
+    "parent": "B04."
   },
   {
     "code": "B04.09.01",
@@ -12993,7 +13017,7 @@
     "code": "B04.10.",
     "name": "胞宮症類",
     "aliases": [],
-    "parent": "null"
+    "parent": "B04."
   },
   {
     "code": "B04.10.01",
@@ -13048,10 +13072,16 @@
     "parent": "B04.10."
   },
   {
+    "code": "B05.",
+    "name": "經絡証候",
+    "aliases": [],
+    "parent": null
+  },
+  {
     "code": "B05.01.",
     "name": "經脈症",
     "aliases": [],
-    "parent": "null"
+    "parent": "B05."
   },
   {
     "code": "B05.01.01",
@@ -13107,7 +13137,7 @@
     "code": "B05.01.03",
     "name": "十二經症",
     "aliases": [],
-    "parent": "B05.01"
+    "parent": "B05.01."
   },
   {
     "code": "B05.01.03.01",
@@ -13396,7 +13426,7 @@
     "code": "B05.02.",
     "name": "絡脈症",
     "aliases": [],
-    "parent": "null"
+    "parent": "B05."
   },
   {
     "code": "B05.02.01",
@@ -13435,5 +13465,785 @@
       "絡脈瘀滯症"
     ],
     "parent": "B05.02."
+  },
+  {
+    "code": "B05.02.04",
+    "name": "絡脈破損症",
+    "aliases": [
+      "經絡傷症"
+    ],
+    "parent": "B05.02."
+  },
+  {
+    "code": "B05.02.04.01",
+    "name": "絡傷出血症",
+    "aliases": [],
+    "parent": "B05.02.04"
+  },
+  {
+    "code": "B05.02.04.02",
+    "name": "絡傷便血症",
+    "aliases": [
+      "傷絡便血症"
+    ],
+    "parent": "B05.02.04"
+  },
+  {
+    "code": "B06.",
+    "name": "六經症候類術語",
+    "aliases": [],
+    "parent": null
+  },
+  {
+    "code": "B06.01.",
+    "name": "太陽症類",
+    "aliases": [],
+    "parent": "B06."
+  },
+  {
+    "code": "B06.01.01",
+    "name": "太陽經症",
+    "aliases": [],
+    "parent": "B06.01."
+  },
+  {
+    "code": "B06.01.01.01",
+    "name": "太陽中風症",
+    "aliases": [],
+    "parent": "B06.01.01"
+  },
+  {
+    "code": "B06.01.01.02",
+    "name": "太陽傷寒症",
+    "aliases": [
+      "太陽寒症"
+    ],
+    "parent": "B06.01.01"
+  },
+  {
+    "code": "B06.01.02",
+    "name": "太陽腑症",
+    "aliases": [],
+    "parent": "B06.01."
+  },
+  {
+    "code": "B06.01.02.01",
+    "name": "太陽蓄水症",
+    "aliases": [],
+    "parent": "B06.01.02"
+  },
+  {
+    "code": "B06.01.02.02",
+    "name": "太陽蓄血症",
+    "aliases": [],
+    "parent": "B06.01.02"
+  },
+  {
+    "code": "B06.01.03",
+    "name": "太陽頭痛症",
+    "aliases": [],
+    "parent": "B06.01."
+  },
+  {
+    "code": "B06.01.04",
+    "name": "太陽痞症",
+    "aliases": [
+      "太陽熱痞症"
+    ],
+    "parent": "B06.01."
+  },
+  {
+    "code": "B06.01.05",
+    "name": "太陽結胸症",
+    "aliases": [],
+    "parent": "B06.01."
+  },
+  {
+    "code": "B06.02.",
+    "name": "陽明症類",
+    "aliases": [],
+    "parent": "B06."
+  },
+  {
+    "code": "B06.02.01",
+    "name": "陽明經症",
+    "aliases": [
+      "陽明氣熱症，陽明熱症",
+      "陽明熱盛症"
+    ],
+    "parent": "B06.02."
+  },
+  {
+    "code": "B06.02.02",
+    "name": "陽明腑實症",
+    "aliases": [
+      "陽明燥結症",
+      "陽明腑症",
+      "陽明熱結症",
+      "陽明實症"
+    ],
+    "parent": "B06.02."
+  },
+  {
+    "code": "B06.02.03",
+    "name": "陽明頭痛症",
+    "aliases": [],
+    "parent": "B06.02."
+  },
+  {
+    "code": "B06.02.04",
+    "name": "陽明發黃症",
+    "aliases": [],
+    "parent": "B06.02."
+  },
+  {
+    "code": "B06.03.",
+    "name": "少陽症類",
+    "aliases": [],
+    "parent": "B06."
+  },
+  {
+    "code": "B06.03.01",
+    "name": "邪入少陽症",
+    "aliases": [
+      "邪犯少陽症"
+    ],
+    "parent": "B06.03."
+  },
+  {
+    "code": "B06.03.02",
+    "name": "邪在少陽症",
+    "aliases": [
+      "熱在少陽症"
+    ],
+    "parent": "B06.03."
+  },
+  {
+    "code": "B06.03.03",
+    "name": "邪郁少陽症",
+    "aliases": [
+      "熱郁少陽症",
+      "熱伏少陽症"
+    ],
+    "parent": "B06.03."
+  },
+  {
+    "code": "B06.03.04",
+    "name": "少陽頭痛症",
+    "aliases": [],
+    "parent": "B06.03."
+  },
+  {
+    "code": "B06.04.",
+    "name": "太陰症類",
+    "aliases": [],
+    "parent": "B06."
+  },
+  {
+    "code": "B06.04.01",
+    "name": "太陰經症",
+    "aliases": [],
+    "parent": "B06.04."
+  },
+  {
+    "code": "B06.04.02",
+    "name": "太陰寒濕症",
+    "aliases": [
+      "太陰腹痛症"
+    ],
+    "parent": "B06.04."
+  },
+  {
+    "code": "B06.04.03",
+    "name": "太陰頭痛症",
+    "aliases": [],
+    "parent": "B06.04."
+  },
+  {
+    "code": "B06.04.04",
+    "name": "太陰發黃症",
+    "aliases": [],
+    "parent": "B06.04."
+  },
+  {
+    "code": "B06.05.",
+    "name": "少陰症類",
+    "aliases": [],
+    "parent": "B06."
+  },
+  {
+    "code": "B06.05.01",
+    "name": "少陰寒化症",
+    "aliases": [],
+    "parent": "B06.05."
+  },
+  {
+    "code": "B06.05.02",
+    "name": "少陰熱化症",
+    "aliases": [],
+    "parent": "B06.05."
+  },
+  {
+    "code": "B06.05.03",
+    "name": "少陰頭痛症",
+    "aliases": [],
+    "parent": "B06.05."
+  },
+  {
+    "code": "B06.06.",
+    "name": "厥陰症類",
+    "aliases": [],
+    "parent": "B06."
+  },
+  {
+    "code": "B06.06.01",
+    "name": "邪犯厥陰症",
+    "aliases": [],
+    "parent": "B06.06."
+  },
+  {
+    "code": "B06.06.01.01",
+    "name": "厥陰中風症",
+    "aliases": [],
+    "parent": "B06.06.01"
+  },
+  {
+    "code": "B06.06.01.02",
+    "name": "厥陰頭痛症",
+    "aliases": [],
+    "parent": "B06.06.01"
+  },
+  {
+    "code": "B06.06.01.03",
+    "name": "厥熱勝復症",
+    "aliases": [],
+    "parent": "B06.06.01"
+  },
+  {
+    "code": "B06.06.02",
+    "name": "厥陰寒症",
+    "aliases": [
+      "傷寒陰厥症，厥陰厥症"
+    ],
+    "parent": "B06.06."
+  },
+  {
+    "code": "B06.06.03",
+    "name": "厥陰熱症",
+    "aliases": [],
+    "parent": "B06.06."
+  },
+  {
+    "code": "B06.07.",
+    "name": "兩感症類",
+    "aliases": [
+      "兩感傷寒症"
+    ],
+    "parent": "B06."
+  },
+  {
+    "code": "B06.07.01",
+    "name": "太陽少陰兩感症",
+    "aliases": [
+      "太少兩感症"
+    ],
+    "parent": "B06.07."
+  },
+  {
+    "code": "B07.",
+    "name": "三焦症候類術語",
+    "aliases": [],
+    "parent": null
+  },
+  {
+    "code": "B07.01.",
+    "name": "三焦實熱症",
+    "aliases": [
+      "三焦積熱症"
+    ],
+    "parent": "B07."
+  },
+  {
+    "code": "B07.02.",
+    "name": "三焦濕熱症",
+    "aliases": [
+      "濕熱瀰漫三焦症"
+    ],
+    "parent": "B07."
+  },
+  {
+    "code": "B07.03.",
+    "name": "三焦壅塞症",
+    "aliases": [
+      "三焦壅滯症"
+    ],
+    "parent": "B07."
+  },
+  {
+    "code": "B07.04.",
+    "name": "三焦虛寒症",
+    "aliases": [],
+    "parent": "B07."
+  },
+  {
+    "code": "B07.05.",
+    "name": "上焦症類",
+    "aliases": [],
+    "parent": "B07."
+  },
+  {
+    "code": "B07.05.01",
+    "name": "上焦溫熱症",
+    "aliases": [],
+    "parent": "B07.05."
+  },
+  {
+    "code": "B07.05.02",
+    "name": "上焦濕熱症",
+    "aliases": [],
+    "parent": "B07.05."
+  },
+  {
+    "code": "B07.05.03",
+    "name": "上焦燥熱症",
+    "aliases": [],
+    "parent": "B07.05."
+  },
+  {
+    "code": "B07.06.",
+    "name": "中焦症類",
+    "aliases": [],
+    "parent": "B07."
+  },
+  {
+    "code": "B07.06.01",
+    "name": "中焦寒濕症",
+    "aliases": [],
+    "parent": "B07.06."
+  },
+  {
+    "code": "B07.06.02",
+    "name": "中焦溫熱症",
+    "aliases": [],
+    "parent": "B07.06."
+  },
+  {
+    "code": "B07.06.03",
+    "name": "中焦實熱症",
+    "aliases": [],
+    "parent": "B07.06."
+  },
+  {
+    "code": "B07.07.",
+    "name": "中焦濕熱症",
+    "aliases": [],
+    "parent": "B07."
+  },
+  {
+    "code": "B07.07.01",
+    "name": "下焦症類",
+    "aliases": [],
+    "parent": "B07.07."
+  },
+  {
+    "code": "B07.07.02",
+    "name": "下焦溫熱症",
+    "aliases": [],
+    "parent": "B07.07."
+  },
+  {
+    "code": "B07.07.03",
+    "name": "下焦熱盛症",
+    "aliases": [
+      "下焦濕熱症"
+    ],
+    "parent": "B07.07."
+  },
+  {
+    "code": "B07.07.04",
+    "name": "濕熱蘊結下焦症",
+    "aliases": [
+      "下焦虛冷症",
+      "下焦虛寒症",
+      "下元虛冷症",
+      "下元虛寒症"
+    ],
+    "parent": "B07.07."
+  },
+  {
+    "code": "B07.07.05",
+    "name": "下焦蓄血症",
+    "aliases": [],
+    "parent": "B07.07."
+  },
+  {
+    "code": "B08.",
+    "name": "衛氣營血症候類術語",
+    "aliases": [],
+    "parent": null
+  },
+  {
+    "code": "B08.01.",
+    "name": "衛分症類",
+    "aliases": [],
+    "parent": "B08."
+  },
+  {
+    "code": "B08.01.01",
+    "name": "衛分症",
+    "aliases": [],
+    "parent": "B08.01."
+  },
+  {
+    "code": "B08.01.02",
+    "name": "衛氣同病症",
+    "aliases": [
+      "邪在衛氣症"
+    ],
+    "parent": "B08.01."
+  },
+  {
+    "code": "B08.01.03",
+    "name": "衛營同病症",
+    "aliases": [],
+    "parent": "B08.01."
+  },
+  {
+    "code": "B08.02.",
+    "name": "氣分症類",
+    "aliases": [],
+    "parent": "B08."
+  },
+  {
+    "code": "B08.02.01",
+    "name": "氣分症",
+    "aliases": [],
+    "parent": "B08.02."
+  },
+  {
+    "code": "B08.02.02",
+    "name": "氣分濕熱症",
+    "aliases": [],
+    "parent": "B08.02."
+  },
+  {
+    "code": "B08.02.03",
+    "name": "氣營兩燔症",
+    "aliases": [],
+    "parent": "B08.02."
+  },
+  {
+    "code": "B08.02.04",
+    "name": "氣血兩燔症",
+    "aliases": [],
+    "parent": "B08.02."
+  },
+  {
+    "code": "B08.03.",
+    "name": "營分症類",
+    "aliases": [],
+    "parent": "B08."
+  },
+  {
+    "code": "B08.03.01",
+    "name": "營分症",
+    "aliases": [],
+    "parent": "B08.03."
+  },
+  {
+    "code": "B08.03.01.01",
+    "name": "熱熾營分症",
+    "aliases": [
+      "營熱熾盛症",
+      "營分熱盛症",
+      "心營熱盛症"
+    ],
+    "parent": "B08.03.01"
+  },
+  {
+    "code": "B08.03.01.02",
+    "name": "營熱閉神症",
+    "aliases": [],
+    "parent": "B08.03.01"
+  },
+  {
+    "code": "B08.03.01.03",
+    "name": "營血熱盛症",
+    "aliases": [],
+    "parent": "B08.03.01"
+  },
+  {
+    "code": "B08.04.",
+    "name": "血分症類",
+    "aliases": [],
+    "parent": "B08."
+  },
+  {
+    "code": "B08.04.01",
+    "name": "血分症",
+    "aliases": [],
+    "parent": "B08.04."
+  },
+  {
+    "code": "B08.04.02",
+    "name": "血熱動血症",
+    "aliases": [],
+    "parent": "B08.04."
+  },
+  {
+    "code": "B08.04.03",
+    "name": "血熱動風症",
+    "aliases": [],
+    "parent": "B08.04."
+  },
+  {
+    "code": "B09.",
+    "name": "其他症候類術語",
+    "aliases": [],
+    "parent": null
+  },
+  {
+    "code": "B09.01.",
+    "name": "稟賦不足症",
+    "aliases": [
+      "先天不足症"
+    ],
+    "parent": "B09."
+  },
+  {
+    "code": "B09.02.",
+    "name": "閉症",
+    "aliases": [],
+    "parent": "B09."
+  },
+  {
+    "code": "B09.02.01",
+    "name": "陰閉症",
+    "aliases": [
+      "陰閉痰濕症"
+    ],
+    "parent": "B09.02."
+  },
+  {
+    "code": "B09.02.01.01",
+    "name": "陰閉腸結症",
+    "aliases": [],
+    "parent": "B09.02.01"
+  },
+  {
+    "code": "B09.02.02",
+    "name": "陽閉症",
+    "aliases": [],
+    "parent": "B09.02."
+  },
+  {
+    "code": "B09.03.",
+    "name": "脫症",
+    "aliases": [],
+    "parent": "B09."
+  },
+  {
+    "code": "B09.03.01",
+    "name": "元神外脫症",
+    "aliases": [],
+    "parent": "B09.03."
+  },
+  {
+    "code": "B09.03.02",
+    "name": "內閉外脫症",
+    "aliases": [],
+    "parent": "B09.03."
+  },
+  {
+    "code": "B09.03.03",
+    "name": "邪陷正脫症",
+    "aliases": [
+      "內陷外脫症"
+    ],
+    "parent": "B09.03."
+  },
+  {
+    "code": "B10.",
+    "name": "期度類術語",
+    "aliases": [],
+    "parent": null
+  },
+  {
+    "code": "B10.01.",
+    "name": "期類",
+    "aliases": [],
+    "parent": "B10."
+  },
+  {
+    "code": "B10.01.01",
+    "name": "初期",
+    "aliases": [
+      "一期"
+    ],
+    "parent": "B10.01."
+  },
+  {
+    "code": "B10.01.02",
+    "name": "中期",
+    "aliases": [
+      "二期"
+    ],
+    "parent": "B10.01."
+  },
+  {
+    "code": "B10.01.03",
+    "name": "後期",
+    "aliases": [
+      "三期"
+    ],
+    "parent": "B10.01."
+  },
+  {
+    "code": "B10.01.04",
+    "name": "晚期",
+    "aliases": [],
+    "parent": "B10.01."
+  },
+  {
+    "code": "B10.01.05",
+    "name": "發作期",
+    "aliases": [],
+    "parent": "B10.01."
+  },
+  {
+    "code": "B10.01.06",
+    "name": "緩解期",
+    "aliases": [],
+    "parent": "B10.01."
+  },
+  {
+    "code": "B10.01.07",
+    "name": "恢復期",
+    "aliases": [],
+    "parent": "B10.01."
+  },
+  {
+    "code": "B10.01.08",
+    "name": "疹前期",
+    "aliases": [],
+    "parent": "B10.01."
+  },
+  {
+    "code": "B10.01.09",
+    "name": "見形期",
+    "aliases": [],
+    "parent": "B10.01."
+  },
+  {
+    "code": "B10.01.10",
+    "name": "出疹期",
+    "aliases": [],
+    "parent": "B10.01."
+  },
+  {
+    "code": "B10.01.11",
+    "name": "疹回期",
+    "aliases": [
+      "疹出熱退症"
+    ],
+    "parent": "B10.01."
+  },
+  {
+    "code": "B10.01.12",
+    "name": "收沒期",
+    "aliases": [],
+    "parent": "B10.01."
+  },
+  {
+    "code": "B10.01.13",
+    "name": "進行期",
+    "aliases": [],
+    "parent": "B10.01."
+  },
+  {
+    "code": "B10.01.14",
+    "name": "退行期",
+    "aliases": [],
+    "parent": "B10.01."
+  },
+  {
+    "code": "B10.01.15",
+    "name": "成癰期",
+    "aliases": [],
+    "parent": "B10.01."
+  },
+  {
+    "code": "B10.01.16",
+    "name": "釀膿期",
+    "aliases": [],
+    "parent": "B10.01."
+  },
+  {
+    "code": "B10.01.17",
+    "name": "成膿期",
+    "aliases": [],
+    "parent": "B10.01."
+  },
+  {
+    "code": "B10.01.18",
+    "name": "潰膿期",
+    "aliases": [],
+    "parent": "B10.01."
+  },
+  {
+    "code": "B10.01.19",
+    "name": "潰後期",
+    "aliases": [],
+    "parent": "B10.01."
+  },
+  {
+    "code": "B10.01.20",
+    "name": "收口期",
+    "aliases": [],
+    "parent": "B10.01."
+  },
+  {
+    "code": "B10.01.21",
+    "name": "未破損期",
+    "aliases": [],
+    "parent": "B10.01."
+  },
+  {
+    "code": "B10.01.22",
+    "name": "已破損期",
+    "aliases": [
+      "破損期"
+    ],
+    "parent": "B10.01."
+  },
+  {
+    "code": "B10.02.",
+    "name": "度類",
+    "aliases": [],
+    "parent": "B10."
+  },
+  {
+    "code": "B10.02.01",
+    "name": "一度",
+    "aliases": [
+      "輕度"
+    ],
+    "parent": "B10.02."
+  },
+  {
+    "code": "B10.02.02",
+    "name": "二度",
+    "aliases": [
+      "中度"
+    ],
+    "parent": "B10.02."
+  },
+  {
+    "code": "B10.02.03",
+    "name": "三度",
+    "aliases": [
+      "重度"
+    ],
+    "parent": "B10.02."
   }
 ]

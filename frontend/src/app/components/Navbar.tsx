@@ -15,6 +15,7 @@ export default function Navbar() {
     { href: "/appointments", label: "預約管理" },
     { href: "/patient_registration", label: "患者登記" },
     { href: "/medical_record", label: "病歷系統" },
+    { href: "/admin/settings", label: "設定管理" },
   ];
 
   return (

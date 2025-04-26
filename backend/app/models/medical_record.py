@@ -84,6 +84,8 @@ class HerbItem(Base):
     amount = Column(String(50), nullable=False)
     unit = Column(String(10), nullable=True, default="g")
     sequence = Column(Integer, nullable=False, default=0)
+    source = Column(String(20), nullable=True, default="manual")
+    structured_data = Column(JSON, nullable=True)
     created_at = Column(DateTime, nullable=False, default=func.now())
     updated_at = Column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
 

@@ -1,6 +1,6 @@
 """
 各種實用工具函數集合
 """
-from app.utils.query_data import *
-from app.utils.query_phone import *
-from app.utils.time import *
+# 僅定義模塊，不要自動導入
+# 從 time 模塊導入常用的函數
+from app.utils.time import now_hk, to_hk

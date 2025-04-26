@@ -7,6 +7,8 @@ import logging
 from typing import Dict
 from app.api import appointments_router, doctors_router, patient_registration_router
 from app.api.appointment_detail import router as appointment_detail_router
+from app.api import reference_data
+from app.api.v1.api import api_router as api_v1_router
 from app.core.config import ALLOWED_ORIGINS
 from app.utils.time import now_hk
 
@@ -40,6 +42,10 @@ def create_app() -> FastAPI:
     app.include_router(doctors_router, prefix="/api/v1/doctors", tags=["doctors"])
     app.include_router(appointment_detail_router, prefix="/api/v1/appointments", tags=["appointment-detail"])
     app.include_router(patient_registration_router, prefix="/api/v1/patient_registration", tags=["patient-registration"])
+    app.include_router(reference_data.router, prefix="/api/v1", tags=["reference-data"])
+    
+    # 註冊 v1 API 路由
+    app.include_router(api_v1_router, prefix="/api/v1", tags=["api-v1"])
 
     @app.get("/")
     async def root() -> Dict[str, str]:

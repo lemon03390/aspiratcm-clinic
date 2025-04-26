@@ -4,7 +4,7 @@ from sqlalchemy import text
 from typing import List, Optional, Any
 from datetime import datetime, timezone
 from app.models import Doctor
-from app.db.database import get_db
+from app.db.session import get_db
 from pydantic import BaseModel
 import logging
 import json

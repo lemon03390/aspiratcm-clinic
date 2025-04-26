@@ -2,7 +2,7 @@
 數據查詢工具
 用於從數據庫中查詢和輸出各種資料
 """
-from app.db.database import SessionLocal
+from app.db.session import SessionLocal
 from sqlalchemy import text
 
 def execute_and_print_query(db, query, title):

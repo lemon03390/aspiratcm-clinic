@@ -12,9 +12,11 @@ import {
   WaitingList,
   PastRecordList
 } from './components';
+import AiHerbSuggestions from './components/AiHerbSuggestions';
 import { getBackendUrl } from '../../libs/apiClient';
 import axios from 'axios';
 import { patientApi, appointmentApi, medicalRecordApi } from './utils/api';
+import { ErrorBoundary } from 'react-error-boundary';
 
 // 定義患者資料類型
 interface PatientInfo {
@@ -67,13 +69,16 @@ export default function MedicalRecordPage() {
     presentIllness: '',
     observation: {},
     diagnosis: {
-      modernDiseases: [] as string[],
-      cmSyndromes: [] as string[],
-      cmPrinciple: ''
+      modernDiseases: [] as { code: string, name: string }[],
+      cmSyndromes: [] as { code: string, name: string }[],
+      cmPrinciple: [] as { code: string, name: string }[]
     },
-    prescription: [] as { name: string; amount: string; id: string }[],
+    prescription: [] as { name: string; amount: string; id: string; code: string }[],
     treatmentMethods: [] as string[]
   });
+  
+  // 新增參考用藥處方實例
+  const herbPrescriptionRef = React.useRef<any>(null);
   
   // 當現有患者變化時重置表單
   useEffect(() => {
@@ -85,7 +90,7 @@ export default function MedicalRecordPage() {
         diagnosis: {
           modernDiseases: [],
           cmSyndromes: [],
-          cmPrinciple: ''
+          cmPrinciple: []
         },
         prescription: [],
         treatmentMethods: []
@@ -277,14 +282,17 @@ export default function MedicalRecordPage() {
     console.log('已更新醫師觀察:', data);
   };
   
-  const handleDiagnosisFormSave = (data: { modernDiseases: string[]; cmSyndromes: string[]; cmPrinciple: string[] }) => {
+  const handleDiagnosisFormSave = (data: { 
+    modernDiseases: { code: string, name: string }[]; 
+    cmSyndromes: { code: string, name: string }[]; 
+    cmPrinciple: { code: string, name: string }[] 
+  }) => {
     setFormData(prev => ({
       ...prev,
       diagnosis: {
         modernDiseases: data.modernDiseases,
         cmSyndromes: data.cmSyndromes,
-        // 中醫治則現在是數組，需要合併
-        cmPrinciple: data.cmPrinciple.join('、')
+        cmPrinciple: data.cmPrinciple
       }
     }));
     console.log('已更新中醫診斷:', data);
@@ -293,7 +301,12 @@ export default function MedicalRecordPage() {
   const handlePrescriptionFormSave = (data: { herbs: any[] }) => {
     setFormData(prev => ({
       ...prev,
-      prescription: data.herbs
+      prescription: data.herbs.map(herb => ({
+        id: herb.id,
+        name: herb.name,
+        amount: herb.amount,
+        code: herb.code || '',
+      }))
     }));
     console.log('已更新中藥處方:', data);
   };
@@ -308,6 +321,18 @@ export default function MedicalRecordPage() {
     console.log('已更新治療方法:', data);
   };
   
+  // 從 AI 建議添加藥材到處方
+  const handleAddHerbFromAi = (herbData: any) => {
+    if (herbPrescriptionRef.current && typeof herbPrescriptionRef.current.addHerb === 'function') {
+      herbPrescriptionRef.current.addHerb({
+        ...herbData,
+        source: 'AI_suggested'
+      });
+    } else {
+      console.warn('無法添加 AI 建議藥材：處方表單引用不可用');
+    }
+  };
+  
   // 保存病歷函數
   const handleSaveRecord = async () => {
     if (!currentPatient) {
@@ -318,11 +343,14 @@ export default function MedicalRecordPage() {
     try {
       setIsLoading(true);
       
-      // 將結構化的診斷數據轉換為字符串
+      // 將結構化的診斷數據轉換為字符串，同時保留原始結構
       const diagnosisText = [
-        formData.diagnosis.modernDiseases.length > 0 ? `現代病名: ${formData.diagnosis.modernDiseases.join('、')}` : '',
-        formData.diagnosis.cmSyndromes.length > 0 ? `中醫辨證: ${formData.diagnosis.cmSyndromes.join('、')}` : '',
-        formData.diagnosis.cmPrinciple ? `中醫治則: ${formData.diagnosis.cmPrinciple}` : ''
+        formData.diagnosis.modernDiseases.length > 0 ? 
+          `現代病名: ${formData.diagnosis.modernDiseases.map(d => d.name).join('、')}` : '',
+        formData.diagnosis.cmSyndromes.length > 0 ? 
+          `中醫辨證: ${formData.diagnosis.cmSyndromes.map(d => d.name).join('、')}` : '',
+        formData.diagnosis.cmPrinciple.length > 0 ? 
+          `中醫治則: ${formData.diagnosis.cmPrinciple.map(d => d.name).join('、')}` : ''
       ].filter(Boolean).join('；');
       
       // 收集所有表單數據
@@ -333,6 +361,11 @@ export default function MedicalRecordPage() {
         present_illness: formData.presentIllness,
         observation: formData.observation,
         diagnosis: diagnosisText || '無診斷',
+        diagnosis_structured: {
+          modernDiseases: formData.diagnosis.modernDiseases,
+          cmSyndromes: formData.diagnosis.cmSyndromes,
+          cmPrinciple: formData.diagnosis.cmPrinciple
+        },
         prescription: formData.prescription.map(herb => `${herb.name} ${herb.amount}`).join('、'),
         treatment_methods: formData.treatmentMethods
       };
@@ -493,8 +526,8 @@ export default function MedicalRecordPage() {
             />
           </div>
           
-          {/* 中間主內容區 */}
-          <div className="col-span-12 md:col-span-6 space-y-6">
+          {/* 右側診療區 */}
+          <div className="col-span-12 md:col-span-9 space-y-6">
             {currentPatient ? (
               <>
                 {/* 患者基本資料 */}
@@ -526,12 +559,25 @@ export default function MedicalRecordPage() {
                 
                 {/* 中醫診斷區 */}
                 <DiagnosisForm
+                  initialValues={formData.diagnosis}
                   onSave={handleDiagnosisFormSave}
+                />
+                
+                {/* AI 用藥建議 */}
+                <AiHerbSuggestions 
+                  modernDiagnosis={formData.diagnosis.modernDiseases.map(d => d.name)}
+                  cmSyndrome={formData.diagnosis.cmSyndromes.map(d => d.name)}
+                  onAddHerb={handleAddHerbFromAi}
                 />
                 
                 {/* 中藥處方區 */}
                 <HerbalPrescriptionForm
+                  initialValues={{
+                    herbs: formData.prescription,
+                    instructions: ''
+                  }}
                   onSave={handlePrescriptionFormSave}
+                  ref={herbPrescriptionRef}
                 />
                 
                 {/* 中醫治療方法 */}

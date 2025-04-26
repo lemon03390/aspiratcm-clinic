@@ -2,7 +2,7 @@
 電話查詢工具
 用於根據電話號碼查詢相關預約資訊
 """
-from app.db.database import SessionLocal
+from app.db.session import SessionLocal
 from sqlalchemy import text
 
 def query_by_phone(phone_number):

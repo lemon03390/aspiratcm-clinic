@@ -1,42 +1,70 @@
 import React, { useState, useEffect, useRef } from 'react';
 
+interface SearchOption {
+  key: string;
+  value: string;
+  originalObject?: any;
+}
+
 interface FuzzySearchInputProps {
-  options: string[];
   placeholder: string;
-  onSelect: (selected: string) => void;
+  onSelect?: (selected: string, option?: SearchOption) => void;
+  onSearch?: (searchTerm: string) => SearchOption[];
   value?: string;
+  defaultValue?: string;
   className?: string;
   multiple?: boolean;
   selectedItems?: string[];
   onRemove?: (item: string) => void;
+  options?: string[];
+  isLoading?: boolean;
 }
 
 const FuzzySearchInput: React.FC<FuzzySearchInputProps> = ({
-  options,
+  options = [],
   placeholder,
   onSelect,
-  value = '',
+  onSearch,
+  value,
+  defaultValue = '',
   className = '',
   multiple = false,
   selectedItems = [],
-  onRemove
+  onRemove,
+  isLoading = false
 }) => {
-  const [inputValue, setInputValue] = useState(value);
-  const [filteredOptions, setFilteredOptions] = useState<string[]>([]);
+  const [inputValue, setInputValue] = useState(value || defaultValue || '');
+  const [filteredOptions, setFilteredOptions] = useState<SearchOption[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // 當 value 從外部變化時更新
+  useEffect(() => {
+    if (value !== undefined) {
+      setInputValue(value);
+    }
+  }, [value]);
 
   // 過濾選項
   useEffect(() => {
     if (inputValue.trim() === '') {
       setFilteredOptions([]);
-    } else {
-      const filtered = options.filter(option => 
-        option.toLowerCase().includes(inputValue.toLowerCase()));
+      return;
+    }
+    
+    if (onSearch) {
+      // 使用自訂搜尋功能
+      const results = onSearch(inputValue);
+      setFilteredOptions(results);
+    } else if (options.length > 0) {
+      // 使用本地過濾
+      const filtered = options
+        .filter(option => option.toLowerCase().includes(inputValue.toLowerCase()))
+        .map(option => ({ key: option, value: option }));
       setFilteredOptions(filtered);
     }
-  }, [inputValue, options]);
+  }, [inputValue, options, onSearch]);
 
   // 點擊外部關閉下拉選單
   useEffect(() => {
@@ -62,15 +90,18 @@ const FuzzySearchInput: React.FC<FuzzySearchInputProps> = ({
     setIsOpen(true);
   };
 
-  const handleSelect = (option: string) => {
+  const handleSelect = (option: SearchOption) => {
     if (multiple) {
-      if (!selectedItems.includes(option)) {
-        onSelect(option);
+      if (!selectedItems.includes(option.value)) {
+        onSelect && onSelect(option.value, option);
       }
       setInputValue('');
     } else {
-      setInputValue(option);
-      onSelect(option);
+      if (!value) {
+        // 如果是非受控組件
+        setInputValue(option.value);
+      }
+      onSelect && onSelect(option.value, option);
     }
     setIsOpen(false);
   };
@@ -103,6 +134,9 @@ const FuzzySearchInput: React.FC<FuzzySearchInputProps> = ({
           className={`flex-grow p-2 outline-none ${multiple ? 'min-w-[100px]' : 'w-full'}`}
           onFocus={() => inputValue && setIsOpen(true)}
         />
+        {isLoading && (
+          <div className="mr-2 h-4 w-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin"></div>
+        )}
       </div>
 
       {/* 下拉選單 */}
@@ -113,11 +147,11 @@ const FuzzySearchInput: React.FC<FuzzySearchInputProps> = ({
         >
           {filteredOptions.map((option, index) => (
             <div
-              key={`${option}-${index}`}
+              key={`${option.key}-${index}`}
               className="px-4 py-2 cursor-pointer hover:bg-gray-100"
               onClick={() => handleSelect(option)}
             >
-              {option}
+              {option.value}
             </div>
           ))}
         </div>

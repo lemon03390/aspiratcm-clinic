@@ -21,38 +21,36 @@ interface SyndromeSelectorProps {
   showTreeView?: boolean;
 }
 
-// 載入證候資料
-let syndromeAutocompleteList: string[] = [];
-let syndromeCodeMapping: Record<string, string> = {}; // 名稱 -> 代碼
-let parentToChildren: Record<string, string[]> = {};
-
-// 非同步載入資料
-async function loadSyndromeData() {
-  try {
-    // 自動完成列表
-    const autocompleteResponse = await fetch('/data/cm_syndrime_autocomplete_list.json');
-    if (autocompleteResponse.ok) {
-      syndromeAutocompleteList = await autocompleteResponse.json();
+// 檢測循環引用
+function findCircularReferences(parentChildMap: Record<string, string[]>): string[] {
+  const circularRefs: string[] = [];
+  
+  // 檢查自引用
+  Object.entries(parentChildMap).forEach(([parent, children]) => {
+    if (children.includes(parent)) {
+      circularRefs.push(parent);
     }
-
-    // 代碼映射
-    const codeMapResponse = await fetch('/data/cm_syndrime_syndrome_code_mapping.json');
-    if (codeMapResponse.ok) {
-      syndromeCodeMapping = await codeMapResponse.json();
-    }
-
-    // 父子關係
-    const parentChildrenResponse = await fetch('/data/cm_syndrime_parent_to_children.json');
-    if (parentChildrenResponse.ok) {
-      parentToChildren = await parentChildrenResponse.json();
-    }
-  } catch (error) {
-    console.error('載入證候資料時出錯:', error);
-  }
+  });
+  
+  return circularRefs;
 }
 
-// 確保在組件渲染前載入資料
-loadSyndromeData();
+// 移除循環引用
+function removeCircularReferences(
+  parentChildMap: Record<string, string[]>, 
+  circularRefs: string[]
+): Record<string, string[]> {
+  const cleanedMap = {...parentChildMap};
+  
+  // 移除自引用
+  circularRefs.forEach(ref => {
+    if (cleanedMap[ref]) {
+      cleanedMap[ref] = cleanedMap[ref].filter(child => child !== ref);
+    }
+  });
+  
+  return cleanedMap;
+}
 
 const SyndromeSelector: React.FC<SyndromeSelectorProps> = ({
   selectedCodes = [],
@@ -66,18 +64,90 @@ const SyndromeSelector: React.FC<SyndromeSelectorProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [treeViewMode, setTreeViewMode] = useState(showTreeView);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+  const [isDataLoading, setIsDataLoading] = useState(true);
+  const [syndromeAutocompleteList, setSyndromeAutocompleteList] = useState<string[]>([]);
+  const [syndromeCodeMapping, setSyndromeCodeMapping] = useState<Record<string, string>>({});
+  const [parentToChildren, setParentToChildren] = useState<Record<string, string[]>>({});
   
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // 確保數據加載完成
+  useEffect(() => {
+    const loadData = async () => {
+      setIsDataLoading(true);
+      try {
+        // 這裡重新加載數據以確保在組件內部可用
+        // 自動完成列表
+        const autocompleteResponse = await fetch('/data/cm_syndrime_autocomplete_list.json');
+        if (autocompleteResponse.ok) {
+          const autocompleteData = await autocompleteResponse.json();
+          setSyndromeAutocompleteList(autocompleteData);
+          console.log('自動完成列表加載成功，項目數:', autocompleteData.length);
+        }
+
+        // 代碼映射
+        const codeMapResponse = await fetch('/data/cm_syndrime_syndrome_code_mapping.json');
+        if (codeMapResponse.ok) {
+          const codeMapData = await codeMapResponse.json();
+          setSyndromeCodeMapping(codeMapData);
+          console.log('代碼映射加載成功，項目數:', Object.keys(codeMapData).length);
+        }
+
+        // 父子關係
+        const parentChildrenResponse = await fetch('/data/cm_syndrime_parent_to_children.json');
+        if (parentChildrenResponse.ok) {
+          let parentChildData = await parentChildrenResponse.json();
+          console.log('父子關係加載成功，項目數:', Object.keys(parentChildData).length);
+          
+          // 檢查並修復循環引用問題
+          const circularRefs = findCircularReferences(parentChildData);
+          if (circularRefs.length > 0) {
+            console.warn('檢測到循環引用，正在移除:', circularRefs);
+            parentChildData = removeCircularReferences(parentChildData, circularRefs);
+          }
+          setParentToChildren(parentChildData);
+        }
+      } catch (error) {
+        console.error('載入證候資料時出錯:', error);
+      } finally {
+        setIsDataLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
   // 將代碼轉換為名稱的反向映射
   const codeToName = useMemo(() => {
     const mapping: Record<string, string> = {};
-    Object.entries(syndromeCodeMapping).forEach(([name, code]) => {
-      mapping[code] = name;
-    });
+    
+    try {
+      // 直接從映射中獲取配對關係
+      Object.entries(syndromeCodeMapping).forEach(([name, code]) => {
+        if (typeof code === 'string') {
+          mapping[code] = name;
+        }
+      });
+      
+      // 驗證映射是否成功生成
+      const keysCount = Object.keys(mapping).length;
+      console.log(`證候代碼到名稱映射成功，共 ${keysCount} 個項目`);
+      
+      // 如果沒有映射成功，嘗試打印一些調試信息
+      if (keysCount === 0) {
+        console.error('ERROR: 證候代碼映射為空，原始映射對象：', syndromeCodeMapping);
+      } else {
+        // 打印前5個作為示例
+        const examples = Object.entries(mapping).slice(0, 5);
+        console.log('證候代碼映射示例：', examples);
+      }
+    } catch (error) {
+      console.error('建立證候代碼到名稱映射時出錯:', error);
+    }
+    
     return mapping;
-  }, []);
+  }, [syndromeCodeMapping]);
 
   // 建立樹狀結構
   const buildTree = useMemo((): SyndromeTreeNode[] => {
@@ -85,14 +155,39 @@ const SyndromeSelector: React.FC<SyndromeSelectorProps> = ({
       !Object.values(parentToChildren).flat().includes(code) || code.endsWith('.')
     );
     
-    const buildSubtree = (code: string): SyndromeTreeNode => {
+    const buildSubtree = (code: string, visitedCodes: Set<string> = new Set()): SyndromeTreeNode => {
+      // 防止循環引用
+      if (visitedCodes.has(code)) {
+        console.warn(`檢測到循環引用: ${code} 已在訪問路徑中`);
+        return { code, name: codeToName[code] || code, children: [] };
+      }
+      
+      // 添加當前節點到已訪問集合
+      const newVisited = new Set(visitedCodes);
+      newVisited.add(code);
+      
       const name = codeToName[code] || code;
-      const children = (parentToChildren[code] || []).map(childCode => buildSubtree(childCode));
+      // 最大深度控制，避免過深的遞迴
+      const maxDepth = 10;
+      if (newVisited.size > maxDepth) {
+        console.warn(`達到最大深度限制 ${maxDepth} 層: ${code}`);
+        return { code, name, children: [] };
+      }
+      
+      // 獲取子節點，確保子節點不包含自身以防止自引用
+      const childCodes = (parentToChildren[code] || []).filter(childCode => childCode !== code);
+      const children = childCodes.map(childCode => buildSubtree(childCode, newVisited));
+      
       return { code, name, children };
     };
     
-    return rootCodes.map(code => buildSubtree(code));
-  }, [codeToName]);
+    try {
+      return rootCodes.map(code => buildSubtree(code));
+    } catch (error) {
+      console.error('建立證候樹狀結構時出錯:', error);
+      return []; // 出錯時返回空數組，避免崩潰
+    }
+  }, [codeToName, parentToChildren]);
 
   // 當輸入值改變時過濾選項
   useEffect(() => {
@@ -109,7 +204,7 @@ const SyndromeSelector: React.FC<SyndromeSelectorProps> = ({
       
       setFilteredOptions(filtered);
     }
-  }, [inputValue]);
+  }, [inputValue, syndromeAutocompleteList, syndromeCodeMapping]);
 
   // 點擊外部關閉下拉選單
   useEffect(() => {
@@ -292,7 +387,23 @@ const SyndromeSelector: React.FC<SyndromeSelectorProps> = ({
           
           {/* 樹狀結構 */}
           <div className="text-sm">
-            {renderTreeNodes(buildTree)}
+            {isDataLoading ? (
+              <div className="flex justify-center items-center p-4">
+                <div className="animate-pulse flex space-x-2">
+                  <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
+                  <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
+                  <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
+                </div>
+                <span className="ml-2 text-gray-500">正在載入證候資料...</span>
+              </div>
+            ) : buildTree.length > 0 ? (
+              renderTreeNodes(buildTree)
+            ) : (
+              <div className="text-center p-4 text-red-500">
+                <p>無法載入證候數據</p>
+                <p className="text-gray-500 text-sm mt-2">請檢查網絡連接或重新整理頁面</p>
+              </div>
+            )}
           </div>
         </div>
       )}
