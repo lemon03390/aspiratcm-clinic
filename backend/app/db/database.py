@@ -1,9 +1,9 @@
-import os
-import logging
 from sqlalchemy import create_engine
-from sqlalchemy.pool import QueuePool
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+import os
 from dotenv import load_dotenv
-from app.models.base import Base
+import logging
 
 # === 設定 Logging ===
 logging.basicConfig(
@@ -18,21 +18,16 @@ load_dotenv()
 # === 從 .env 取得資料庫設定 ===
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "5432")
-DB_NAME = os.getenv("DB_DATABASE")  # 移除預設值，強制從環境變數讀取
+DB_NAME = os.getenv("DB_DATABASE", "clinic")  # 提供預設值以防環境變數未設定
 DB_USER = os.getenv("DB_USERNAME", "postgres")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "postgres")
 
 # === 組合連線字串 ===
-SQLALCHEMY_DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-logger.info(f"使用的資料庫連線：{SQLALCHEMY_DATABASE_URL}")
+DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+logger.info(f"使用的資料庫連線：{DATABASE_URL}")
 
 # === 建立 SQLAlchemy 引擎 ===
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    poolclass=QueuePool,
-    pool_size=5,
-    max_overflow=10,
-    pool_timeout=30,
-    pool_recycle=1800,
-    pool_pre_ping=True,
-)
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()

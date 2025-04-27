@@ -1,6 +1,6 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON, Text
 from sqlalchemy.orm import relationship
-from app.models.base import Base
+from app.db.database import Base
 from app.utils.time import now_hk
 
 class Appointment(Base):
@@ -18,6 +18,8 @@ class Appointment(Base):
     is_first_time = Column(Integer, default=0)  # 0: 非首次求診, 1: 首次求診
     is_troublesome = Column(Integer, default=0)  # 0: 非麻煩症患者, 1: 麻煩症患者  
     is_contagious = Column(Integer, default=0)  # 0: 非傳染病患者, 1: 傳染病患者
+    referral_source = Column(String, nullable=True)  # 預約來源
+    referral_notes = Column(Text, nullable=True)  # 預約來源備註
     created_at = Column(DateTime, default=lambda: now_hk())
     updated_at = Column(DateTime, default=lambda: now_hk(), onupdate=lambda: now_hk())
 

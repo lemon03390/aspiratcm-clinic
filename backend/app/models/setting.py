@@ -1,7 +1,7 @@
 from sqlalchemy import Column, String, Integer, ForeignKey, Text
 from sqlalchemy.orm import relationship
 
-from app.models.base import Base
+from app.db.database import Base
 
 
 class TcmSetting(Base):

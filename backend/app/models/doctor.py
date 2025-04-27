@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime, ARRAY
 from sqlalchemy.orm import relationship
-from app.models.base import Base
+from app.db.database import Base
 from app.utils.time import now_hk
 
 class Doctor(Base):
@@ -16,3 +16,5 @@ class Doctor(Base):
     
     # 關聯醫療記錄
     medical_records = relationship("MedicalRecord", back_populates="doctor") 
+    # 關聯預約時段
+    appointment_slots = relationship("AppointmentSlot", back_populates="doctor") 

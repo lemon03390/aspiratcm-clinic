@@ -1,10 +1,10 @@
 "use client";
-import React, { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import React, { Component, ErrorInfo, ReactNode, useEffect, useState } from 'react';
+import { getBackendUrl } from '../../../libs/apiClient';
+import { checkIdNumber, createPatient, getPatientByPhoneNumber, getReferenceData } from '../services/api';
 import { PatientCreateRequest, ReferenceData } from '../types';
 import RegionSelector from './RegionSelector';
-import { createPatient, getReferenceData, checkIdNumber, getPatientByPhoneNumber } from '../services/api';
-import { getBackendUrl } from '../../../libs/apiClient';
 
 // 錯誤邊界組件
 class ErrorBoundary extends Component<
@@ -37,8 +37,8 @@ class ErrorBoundary extends Component<
             <summary>錯誤詳情</summary>
             <pre className="mt-2 whitespace-pre-wrap">{this.state.error?.toString()}</pre>
           </details>
-          <button 
-            onClick={() => window.location.reload()} 
+          <button
+            onClick={() => window.location.reload()}
             className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
           >
             重新載入頁面
@@ -65,17 +65,17 @@ const PatientForm: React.FC = () => {
     doctor_name: string;
     registration_time: string;
   } | null>(null);
-  
+
   // 添加健康資訊顯示控制
   const [hasBasicDisease, setHasBasicDisease] = useState<boolean>(false);
   const [hasDrugAllergy, setHasDrugAllergy] = useState<boolean>(false);
   const [hasFoodAllergy, setHasFoodAllergy] = useState<boolean>(false);
-  
+
   // 添加其他描述輸入框狀態
   const [otherBasicDisease, setOtherBasicDisease] = useState<string>('');
   const [otherDrugAllergy, setOtherDrugAllergy] = useState<string>('');
   const [otherFoodAllergy, setOtherFoodAllergy] = useState<string>('');
-  
+
   // 表單數據
   const [formData, setFormData] = useState<PatientCreateRequest>({
     chinese_name: '',
@@ -121,19 +121,19 @@ const PatientForm: React.FC = () => {
         console.log("🔍 測試 URL 生成:", testUrl);
         console.log("🔍 window.location.origin =", window.location.origin);
         console.log("🔍 window.location.protocol =", window.location.protocol);
-        
+
         if (testUrl.startsWith('http:')) {
           console.error("⛔ URL 協議錯誤，使用了 HTTP:", testUrl);
         }
-        
+
         // 附加時間戳以避免緩存
         console.log("🕒 正在請求參考數據，時間戳:", new Date().toISOString());
         const data = await getReferenceData();
         console.log("✅ 成功獲取參考數據!", data);
-        
+
         // 如果 API 返回的 doctors 不是數組或為空，嘗試從直接獲取醫師資料
         let doctorsData = data.doctors;
-        
+
         if (!doctorsData || !Array.isArray(doctorsData) || doctorsData.length === 0) {
           console.warn("⚠️ 未能從 API 獲取醫師數據，嘗試獲取緊急備用方案");
           try {
@@ -147,14 +147,14 @@ const PatientForm: React.FC = () => {
             console.error("❌ 緊急備用方案失敗:", e);
           }
         }
-        
+
         // 新增：日誌醫師數據
         if (data.doctors && data.doctors.length > 0) {
           console.log("👨‍⚕️ 成功載入醫師數據:", data.doctors);
         } else {
           console.warn("⚠️ 醫師數據為空或不存在:", data.doctors);
         }
-        
+
         setReferenceData(data);
       } catch (error) {
         console.error('❌ 獲取參考數據失敗:', error);
@@ -164,7 +164,7 @@ const PatientForm: React.FC = () => {
           console.error('錯誤訊息:', error.message);
           console.error('錯誤堆疊:', error.stack);
         }
-        
+
         // 創建一個基本的參考資料對象，包含默認醫師列表
         const fallbackData: ReferenceData = {
           basic_diseases: ['我沒有任何基礎病', '高血壓', '糖尿病', '心臟病', '其他，請列明'],
@@ -178,7 +178,7 @@ const PatientForm: React.FC = () => {
         };
         console.log("🔄 使用後備參考資料:", fallbackData);
         setReferenceData(fallbackData);
-        
+
         setMessage({
           type: 'error',
           text: '無法加載參考數據，已使用基本資料。您可以繼續填寫表單，但若無法提交請刷新頁面重試。'
@@ -211,7 +211,7 @@ const PatientForm: React.FC = () => {
         }
       }
     };
-    
+
     if (isInitialVisit) {
       const debounceTimeout = setTimeout(checkExistingPatient, 500);
       return () => clearTimeout(debounceTimeout);
@@ -234,19 +234,19 @@ const PatientForm: React.FC = () => {
     isChecked: boolean
   ) => {
     console.log(`複選框變更: ${field}, ${option}, ${isChecked}`); // 新增日誌
-    
+
     setFormData(prev => {
       let updatedOptions = [...prev[field]];
-      
+
       // 處理"無"選項與其他選項的互斥關係
       const isNoneOption = option.includes('我沒有');
       const isOtherOption = option.includes('其他');
-      
+
       if (isChecked) {
         // 如果選中的是"無"選項，則清除其他所有選項
         if (isNoneOption) {
           updatedOptions = [option];
-          
+
           // 清空所有「其他」輸入框的值
           if (field === 'basic_diseases') {
             setOtherBasicDisease('');
@@ -264,7 +264,7 @@ const PatientForm: React.FC = () => {
       } else {
         // 取消選中時，從列表中移除該選項
         updatedOptions = updatedOptions.filter(item => item !== option);
-        
+
         // 如果是取消勾選的是「其他」相關選項，清空對應的輸入框
         if (isOtherOption) {
           if (field === 'basic_diseases') {
@@ -275,20 +275,20 @@ const PatientForm: React.FC = () => {
             setOtherFoodAllergy('');
           }
         }
-        
+
         // 如果移除後沒有選項，則添加"無"選項
         if (updatedOptions.length === 0) {
-          updatedOptions = field === 'basic_diseases' 
+          updatedOptions = field === 'basic_diseases'
             ? ['我沒有任何基礎病']
             : field === 'drug_allergies'
-            ? ['我沒有任何藥物過敏']
-            : ['我沒有任何食物過敏'];
+              ? ['我沒有任何藥物過敏']
+              : ['我沒有任何食物過敏'];
         }
       }
-      
+
       // 日誌最終選項狀態
       console.log(`${field} 最終選項:`, updatedOptions);
-      
+
       return {
         ...prev,
         [field]: updatedOptions
@@ -301,14 +301,14 @@ const PatientForm: React.FC = () => {
     field: 'basic_diseases' | 'drug_allergies' | 'food_allergies',
     value: string
   ) => {
-    const otherOption = field === 'basic_diseases' 
-      ? '其他，請列明' 
-      : field === 'drug_allergies' 
-      ? '其他藥物，請列明' 
-      : '其他食物，請列明';
-    
+    const otherOption = field === 'basic_diseases'
+      ? '其他，請列明'
+      : field === 'drug_allergies'
+        ? '其他藥物，請列明'
+        : '其他食物，請列明';
+
     console.log(`其他選項輸入變更: ${field}, "${otherOption}", 值: "${value}"`);
-    
+
     // 更新相應的其他描述輸入框狀態
     if (field === 'basic_diseases') {
       setOtherBasicDisease(value);
@@ -317,16 +317,16 @@ const PatientForm: React.FC = () => {
     } else {
       setOtherFoodAllergy(value);
     }
-    
+
     // 確保「其他，請列明」選項被選中
     if (!formData[field].includes(otherOption)) {
       console.log(`強制將 "${otherOption}" 選項添加到 ${field}`);
-      
+
       // 修改：無論有沒有值，都確保選項被選中
       setFormData(prev => {
         // 先移除「我沒有...」選項
         const filteredOptions = prev[field].filter(item => !item.includes('我沒有'));
-        
+
         // 然後添加「其他」選項（如果尚未存在）
         if (!filteredOptions.includes(otherOption)) {
           return {
@@ -334,7 +334,7 @@ const PatientForm: React.FC = () => {
             [field]: [...filteredOptions, otherOption]
           };
         }
-        
+
         return prev;
       });
     }
@@ -392,7 +392,7 @@ const PatientForm: React.FC = () => {
         type: 'info',
         text: '請輸入身份證號碼或電話號碼查詢現有患者'
       });
-      
+
       // 自動聚焦到搜索欄
       setTimeout(() => {
         const searchInput = document.getElementById('patient-search');
@@ -416,7 +416,7 @@ const PatientForm: React.FC = () => {
     setIsLoading(true);
     try {
       let patient;
-      
+
       // 判斷是身份證還是電話號碼
       if (/^\d+$/.test(searchQuery)) {
         // 全數字，可能是電話號碼
@@ -452,12 +452,12 @@ const PatientForm: React.FC = () => {
         sub_district: patient.sub_district,
         chief_complaint: patient.chief_complaint || '', // 設置主訴欄位
       });
-      
+
       // 檢查是否有「其他，請列明」項目，如有則提取內容到對應輸入框狀態
       processOtherItems(patient.basic_diseases, 'basic_diseases');
       processOtherItems(patient.drug_allergies, 'drug_allergies');
       processOtherItems(patient.food_allergies, 'food_allergies');
-      
+
       // 設置健康資訊狀態
       setHasBasicDisease(!patient.basic_diseases.some(d => d.includes('我沒有')));
       setHasDrugAllergy(!patient.drug_allergies.some(d => d.includes('我沒有')));
@@ -480,7 +480,7 @@ const PatientForm: React.FC = () => {
       setIsLoading(false);
     }
   };
-  
+
   // 允許重新編輯覆診患者資料
   const handleEditFields = () => {
     setFieldsReadOnly(false);
@@ -493,17 +493,17 @@ const PatientForm: React.FC = () => {
   // 從現有數據中提取「其他，請列明」的內容
   const processOtherItems = (items: string[], field: 'basic_diseases' | 'drug_allergies' | 'food_allergies') => {
     // 檢查不同格式的「其他」選項
-    const otherItem = items.find(item => 
-      item.startsWith('其他:') || 
-      item.startsWith('其他，請列明:') || 
-      item.startsWith('其他藥物:') || 
+    const otherItem = items.find(item =>
+      item.startsWith('其他:') ||
+      item.startsWith('其他，請列明:') ||
+      item.startsWith('其他藥物:') ||
       item.startsWith('其他食物:')
     );
-    
+
     if (!otherItem) {
       return;
     }
-    
+
     let otherValue = '';
     if (otherItem.startsWith('其他:')) {
       otherValue = otherItem.replace('其他:', '').trim();
@@ -514,17 +514,17 @@ const PatientForm: React.FC = () => {
     } else if (otherItem.startsWith('其他食物:')) {
       otherValue = otherItem.replace('其他食物:', '').trim();
     }
-    
+
     if (field === 'basic_diseases') {
       setOtherBasicDisease(otherValue);
       // 在表單數據中替換為「其他，請列明」選項
       setFormData(prev => ({
         ...prev,
         [field]: [
-          ...prev[field].filter(item => 
-            !item.startsWith('其他:') && 
+          ...prev[field].filter(item =>
+            !item.startsWith('其他:') &&
             !item.startsWith('其他，請列明:')
-          ), 
+          ),
           '其他疾病，請列明'
         ]
       }));
@@ -533,10 +533,10 @@ const PatientForm: React.FC = () => {
       setFormData(prev => ({
         ...prev,
         [field]: [
-          ...prev[field].filter(item => 
-            !item.startsWith('其他藥物:') && 
+          ...prev[field].filter(item =>
+            !item.startsWith('其他藥物:') &&
             !item.startsWith('其他，請列明:')
-          ), 
+          ),
           '其他藥物，請列明'
         ]
       }));
@@ -545,10 +545,10 @@ const PatientForm: React.FC = () => {
       setFormData(prev => ({
         ...prev,
         [field]: [
-          ...prev[field].filter(item => 
-            !item.startsWith('其他食物:') && 
+          ...prev[field].filter(item =>
+            !item.startsWith('其他食物:') &&
             !item.startsWith('其他，請列明:')
-          ), 
+          ),
           '其他食物，請列明'
         ]
       }));
@@ -575,10 +575,10 @@ const PatientForm: React.FC = () => {
 
       // 驗證必填欄位
       const requiredFields: (keyof PatientCreateRequest)[] = [
-        'chinese_name', 'english_name', 'id_number', 'birth_date', 
+        'chinese_name', 'english_name', 'id_number', 'birth_date',
         'phone_number', 'data_source', 'region', 'district', 'sub_district'
       ];
-      
+
       const missingFields = requiredFields.filter(field => !formData[field]);
       if (missingFields.length > 0) {
         setMessage({
@@ -588,7 +588,7 @@ const PatientForm: React.FC = () => {
         setIsLoading(false);
         return;
       }
-      
+
       // 新增: 使用正則表達式驗證中英文姓名格式
       const chineseNameRegex = /^[\u4e00-\u9fa5]{2,10}$/;
       if (!chineseNameRegex.test(formData.chinese_name)) {
@@ -615,13 +615,13 @@ const PatientForm: React.FC = () => {
 
       // 強制處理 email 欄位 - 確保空欄位轉為 no@no.com
       console.log("處理 email 之前:", processedData.email, typeof processedData.email);
-      
+
       // 明確檢查所有可能的空值情況，並確保使用特定的 no@no.com 值
-      if (processedData.email === undefined || 
-          processedData.email === null || 
-          processedData.email === '' || 
-          processedData.email === 'undefined' ||
-          (typeof processedData.email === 'string' && processedData.email.trim() === '')) {
+      if (processedData.email === undefined ||
+        processedData.email === null ||
+        processedData.email === '' ||
+        processedData.email === 'undefined' ||
+        (typeof processedData.email === 'string' && processedData.email.trim() === '')) {
         console.log("Email 欄位無效，設置為 no@no.com");
         processedData.email = 'no@no.com';
       } else if (typeof processedData.email === 'string' && !(/^[^\s@]+@[^\s@]+\.[^\s@]+$/).test(processedData.email)) {
@@ -629,7 +629,7 @@ const PatientForm: React.FC = () => {
         console.log("自動轉換為 no@no.com");
         processedData.email = 'no@no.com';
       }
-      
+
       console.log("處理 email 之後:", processedData.email);
 
       // 處理基礎疾病
@@ -646,13 +646,13 @@ const PatientForm: React.FC = () => {
       } else if (processedData.basic_diseases.includes('其他，請列明')) {
         // 若沒有填寫「其他」內容，則移除「其他」選項
         processedData.basic_diseases = processedData.basic_diseases.filter(d => d !== '其他，請列明');
-        
+
         // 如果移除後沒有選項，則添加"無"選項
         if (processedData.basic_diseases.length === 0) {
           processedData.basic_diseases = ['我沒有任何基礎病'];
         }
       }
-      
+
       // 處理藥物過敏
       if (processedData.drug_allergies.includes('其他藥物，請列明') && otherDrugAllergy.trim()) {
         // 創建新的陣列，避免修改原有陣列
@@ -667,13 +667,13 @@ const PatientForm: React.FC = () => {
       } else if (processedData.drug_allergies.includes('其他藥物，請列明')) {
         // 若沒有填寫「其他」內容，則移除「其他」選項
         processedData.drug_allergies = processedData.drug_allergies.filter(d => d !== '其他藥物，請列明');
-        
+
         // 如果移除後沒有選項，則添加"無"選項
         if (processedData.drug_allergies.length === 0) {
           processedData.drug_allergies = ['我沒有任何藥物過敏'];
         }
       }
-      
+
       // 處理食物過敏
       if (processedData.food_allergies.includes('其他食物，請列明') && otherFoodAllergy.trim()) {
         // 創建新的陣列，避免修改原有陣列
@@ -688,7 +688,7 @@ const PatientForm: React.FC = () => {
       } else if (processedData.food_allergies.includes('其他食物，請列明')) {
         // 若沒有填寫「其他」內容，則移除「其他」選項
         processedData.food_allergies = processedData.food_allergies.filter(d => d !== '其他食物，請列明');
-        
+
         // 如果移除後沒有選項，則添加"無"選項
         if (processedData.food_allergies.length === 0) {
           processedData.food_allergies = ['我沒有任何食物過敏'];
@@ -697,18 +697,18 @@ const PatientForm: React.FC = () => {
 
       console.log('✅ 嘗試提交表單數據:', JSON.stringify(processedData));
       console.log('確認 Email 值:', processedData.email);
-      
+
       // 最終安全檢查，確保 email 存在且格式正確
       if (!processedData.email || processedData.email === '' || typeof processedData.email !== 'string') {
         processedData.email = 'no@no.com';
         console.log('最終安全檢查: 設置 email 為 no@no.com');
       }
-      
+
       // 提交表單數據
       const response = await createPatient(processedData);
-      
+
       console.log('✅ 患者創建成功:', response);
-      
+
       // 保存成功的數據，用於顯示成功卡片
       const doctorName = referenceData?.doctors?.find(d => d.id === formData.doctor_id)?.name || '未知醫師';
       setSuccessData({
@@ -723,21 +723,21 @@ const PatientForm: React.FC = () => {
           minute: '2-digit'
         })
       });
-      
+
       setMessage({
         type: 'success',
         text: `患者登記成功！掛號編號: ${response.registration_number}`
       });
-      
+
       // 清空基本表單狀態
       setFieldsReadOnly(false);
       setOtherBasicDisease('');
       setOtherDrugAllergy('');
       setOtherFoodAllergy('');
-      
+
     } catch (error: any) {
       console.error('❌ 提交患者登記表單錯誤:', error);
-      
+
       // 處理驗證錯誤 - 來自我們的增強型 API 錯誤
       if (error.isValidationError || (error.response && error.response.status === 422)) {
         // 檢查是否有結構化的驗證錯誤
@@ -746,7 +746,7 @@ const PatientForm: React.FC = () => {
           const errorDetails = Object.entries(error.validationErrors)
             .map(([field, message]) => `${field}: ${message}`)
             .join('\n');
-          
+
           setMessage({
             type: 'error',
             text: `請檢查以下欄位:\n${errorDetails}`
@@ -754,13 +754,13 @@ const PatientForm: React.FC = () => {
         } else if (error.response?.data?.detail) {
           // 後端返回的詳細錯誤
           let errorMsg = '';
-          
+
           // 處理 Pydantic 驗證錯誤數組
           if (Array.isArray(error.response.data.detail)) {
             errorMsg = error.response.data.detail
               .map((err: any) => {
-                const field = err.loc && err.loc.length > 1 
-                  ? err.loc.slice(1).join('.') 
+                const field = err.loc && err.loc.length > 1
+                  ? err.loc.slice(1).join('.')
                   : '未知欄位';
                 return `${field}: ${err.msg}`;
               })
@@ -768,7 +768,7 @@ const PatientForm: React.FC = () => {
           } else {
             errorMsg = error.response.data.detail;
           }
-          
+
           setMessage({
             type: 'error',
             text: `資料驗證失敗:\n${errorMsg}`
@@ -790,12 +790,11 @@ const PatientForm: React.FC = () => {
         // 其他 HTTP 錯誤
         setMessage({
           type: 'error',
-          text: `伺服器錯誤 (${error.response.status}): ${
-            error.response.data?.detail || 
-            error.response.data?.message || 
-            error.message || 
+          text: `伺服器錯誤 (${error.response.status}): ${error.response.data?.detail ||
+            error.response.data?.message ||
+            error.message ||
             '請稍後再試'
-          }`
+            }`
         });
       } else {
         // 未知錯誤
@@ -819,25 +818,25 @@ const PatientForm: React.FC = () => {
     console.log('- 其他基礎疾病值:', otherBasicDisease);
     console.log('- 其他藥物過敏值:', otherDrugAllergy);
     console.log('- 其他食物過敏值:', otherFoodAllergy);
-  }, [formData.basic_diseases, formData.drug_allergies, formData.food_allergies, 
-      otherBasicDisease, otherDrugAllergy, otherFoodAllergy]);
+  }, [formData.basic_diseases, formData.drug_allergies, formData.food_allergies,
+    otherBasicDisease, otherDrugAllergy, otherFoodAllergy]);
 
   // 添加測試用的渲染檢查
   useEffect(() => {
     // 檢查藥物過敏和食物過敏的「其他」選項是否被正確處理
     const hasDrugOther = formData.drug_allergies.includes('其他藥物，請列明');
     const hasFoodOther = formData.food_allergies.includes('其他食物，請列明');
-    
+
     console.log('渲染檢查:');
     console.log('- 藥物過敏包含「其他」選項:', hasDrugOther);
     console.log('- 食物過敏包含「其他」選項:', hasFoodOther);
-    
+
     // 檢查醫師下拉選單
     if (referenceData) {
-      console.log('- 醫師列表狀態:', 
-        referenceData.doctors ? 
-        `有效 (${Array.isArray(referenceData.doctors) ? referenceData.doctors.length : '非數組'})` : 
-        '無效'
+      console.log('- 醫師列表狀態:',
+        referenceData.doctors ?
+          `有效 (${Array.isArray(referenceData.doctors) ? referenceData.doctors.length : '非數組'})` :
+          '無效'
       );
     }
   }, [formData.drug_allergies, formData.food_allergies, referenceData]);
@@ -848,17 +847,17 @@ const PatientForm: React.FC = () => {
     console.log('初始化頁面狀態:');
     console.log('- 參考資料:', referenceData);
     console.log('- 表單數據:', formData);
-    
+
     // 檢查醫師資料是否成功載入
     if (referenceData && (!referenceData.doctors || !Array.isArray(referenceData.doctors) || referenceData.doctors.length === 0)) {
       console.warn('⚠️ 醫師資料加載失敗，嘗試重新載入');
-      
+
       // 設置自動重試計時器
       const retryTimer = setTimeout(async () => {
         try {
           console.log('🔄 自動重試載入醫師資料');
           const data = await getReferenceData();
-          
+
           // 檢查重試後的資料是否有醫師
           if (data.doctors && Array.isArray(data.doctors) && data.doctors.length > 0) {
             console.log('✅ 重試成功，載入了醫師資料:', data.doctors);
@@ -878,7 +877,7 @@ const PatientForm: React.FC = () => {
           console.error('❌ 自動重試載入醫師資料失敗:', error);
         }
       }, 3000); // 3秒後自動重試
-      
+
       // 清除計時器
       return () => clearTimeout(retryTimer);
     }
@@ -945,105 +944,92 @@ const PatientForm: React.FC = () => {
     if (!successData) {
       return null;
     }
-    
+
+    const handleRegisterAnother = () => {
+      setFormData({
+        chinese_name: '',
+        english_name: '',
+        id_number: '',
+        birth_date: '',
+        phone_number: '',
+        email: 'no@no.com',
+        gender: '',
+        basic_diseases: ['我沒有任何基礎病'],
+        drug_allergies: ['我沒有任何藥物過敏'],
+        food_allergies: ['我沒有任何食物過敏'],
+        note: '',
+        has_appointment: false,
+        doctor_id: undefined,
+        data_source: '',
+        region: '',
+        district: '',
+        sub_district: '',
+        chief_complaint: '',
+      });
+      setHasBasicDisease(false);
+      setHasDrugAllergy(false);
+      setHasFoodAllergy(false);
+      setSuccessData(null);
+    };
+
     return (
-      <div className="bg-white shadow-md rounded-lg p-6 mb-6 border-2 border-green-500">
-        <div className="flex items-center mb-4">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-500 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="flex items-center text-green-600 mb-4">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-8 w-8 mr-2"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M5 13l4 4L19 7"
+            />
           </svg>
-          <h2 className="text-2xl font-bold text-gray-800">掛號成功</h2>
+          <h2 className="text-xl font-semibold">掛號成功</h2>
         </div>
-        
-        <div className="mb-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-gray-500">患者姓名</p>
-              <p className="text-lg font-medium">{successData.chinese_name}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">掛號編號</p>
-              <p className="text-lg font-medium">{successData.registration_number}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">主診醫師</p>
-              <p className="text-lg font-medium">{successData.doctor_name}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">登記時間</p>
-              <p className="text-lg font-medium">{successData.registration_time}</p>
-            </div>
+
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <p className="text-gray-600">患者姓名</p>
+            <p className="font-medium">{successData.chinese_name}</p>
+          </div>
+          <div>
+            <p className="text-gray-600">掛號編號</p>
+            <p className="font-medium">{successData.registration_number}</p>
+          </div>
+          <div>
+            <p className="text-gray-600">主診醫師</p>
+            <p className="font-medium">{successData.doctor_name || '未指定'}</p>
+          </div>
+          <div>
+            <p className="text-gray-600">登記時間</p>
+            <p className="font-medium">{successData.registration_time}</p>
           </div>
         </div>
-        
+
         <div className="flex flex-wrap gap-3 mt-6">
           <button
-            type="button"
-            onClick={() => {
-              setFormData({
-                chinese_name: '',
-                english_name: '',
-                id_number: '',
-                birth_date: '',
-                phone_number: '',
-                email: 'no@no.com',
-                gender: '',
-                basic_diseases: ['我沒有任何基礎病'],
-                drug_allergies: ['我沒有任何藥物過敏'],
-                food_allergies: ['我沒有任何食物過敏'],
-                note: '',
-                has_appointment: false,
-                doctor_id: undefined,
-                data_source: '',
-                region: '',
-                district: '',
-                sub_district: '',
-                chief_complaint: '', // 重置主訴欄位
-              });
-              setHasBasicDisease(false);
-              setHasDrugAllergy(false);
-              setHasFoodAllergy(false);
-              setSuccessData(null);
-            }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
+            onClick={handleRegisterAnother}
+            className="flex-1 min-w-[120px] py-2 px-4 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
-            </svg>
             再登記一位病人
           </button>
-          
-          <button
-            type="button"
-            onClick={() => router.push('/')}
-            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 flex items-center"
+          <a
+            href={`/appointments?patient_name=${encodeURIComponent(successData.chinese_name)}&phone_number=${encodeURIComponent(formData.phone_number)}`}
+            className="flex-1 min-w-[120px] py-2 px-4 bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors text-center"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
-            </svg>
-            返回首頁
-          </button>
-          
-          <button
-            type="button"
-            onClick={() => {
-              if (successData.registration_number) {
-                router.push(`/patients/${successData.registration_number}`);
-              } else {
-                setMessage({
-                  type: 'error',
-                  text: '無法查看患者詳情：掛號編號不存在'
-                });
-              }
-            }}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center"
+            為此患者預約
+          </a>
+          <a
+            href="/medical_record"
+            className="flex-1 min-w-[120px] py-2 px-4 bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors text-center"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-              <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-            </svg>
-            查看患者詳情
-          </button>
+            前往病歷系統
+          </a>
         </div>
       </div>
     );
@@ -1073,44 +1059,41 @@ const PatientForm: React.FC = () => {
         ) : (
           <form onSubmit={handleSubmit}>
             {message && (
-              <div className={`mb-4 p-3 rounded-md ${
-                message.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 
-                message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 
-                'bg-blue-50 text-blue-700 border border-blue-200'
-              }`}>
+              <div className={`mb-4 p-3 rounded-md ${message.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' :
+                message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' :
+                  'bg-blue-50 text-blue-700 border border-blue-200'
+                }`}>
                 <p className="whitespace-pre-line">{message.text}</p>
               </div>
             )}
-            
+
             {/* 初診/複診切換 */}
             <div className="flex justify-between items-center mb-6">
               <div className="text-lg font-bold">患者登記表</div>
               <div className="flex space-x-2">
                 <button
                   type="button"
-                  className={`px-4 py-2 rounded-md ${
-                    isInitialVisit 
-                    ? 'bg-blue-600 text-white' 
+                  className={`px-4 py-2 rounded-md ${isInitialVisit
+                    ? 'bg-blue-600 text-white'
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
+                    }`}
                   onClick={() => handleVisitTypeChange(true)}
                 >
                   初診
                 </button>
                 <button
                   type="button"
-                  className={`px-4 py-2 rounded-md ${
-                    isInitialVisit 
+                  className={`px-4 py-2 rounded-md ${isInitialVisit
                     ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                     : 'bg-blue-600 text-white'
-                  }`}
+                    }`}
                   onClick={() => handleVisitTypeChange(false)}
                 >
                   複診
                 </button>
               </div>
             </div>
-            
+
             {/* 複診搜尋 */}
             {!isInitialVisit && (
               <div className="mb-6 p-4 bg-blue-50 rounded-md border border-blue-200">
@@ -1135,7 +1118,7 @@ const PatientForm: React.FC = () => {
                 </div>
               </div>
             )}
-            
+
             {/* 覆診資料編輯控制 */}
             {!isInitialVisit && fieldsReadOnly && (
               <div className="mb-4 flex justify-end">
@@ -1151,9 +1134,9 @@ const PatientForm: React.FC = () => {
                 </button>
               </div>
             )}
-            
+
             <h2 className="text-xl font-bold mb-4">基本資料</h2>
-            
+
             {/* 基本資料區塊 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               {/* 姓名欄位 */}
@@ -1171,7 +1154,7 @@ const PatientForm: React.FC = () => {
                   required
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   英文姓名 <span className="text-red-500">*</span>
@@ -1186,7 +1169,7 @@ const PatientForm: React.FC = () => {
                   required
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   身份證號碼 <span className="text-red-500">*</span>
@@ -1201,7 +1184,7 @@ const PatientForm: React.FC = () => {
                   required
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   出生日期 <span className="text-red-500">*</span>
@@ -1216,7 +1199,7 @@ const PatientForm: React.FC = () => {
                   required
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   手機號碼 <span className="text-red-500">*</span>
@@ -1231,7 +1214,7 @@ const PatientForm: React.FC = () => {
                   required
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   電子郵件 (選填)
@@ -1246,7 +1229,7 @@ const PatientForm: React.FC = () => {
                   placeholder="輸入電子郵件或留空"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   性別 <span className="text-red-500">*</span>
@@ -1264,7 +1247,7 @@ const PatientForm: React.FC = () => {
                   <option value="其他">其他</option>
                 </select>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   從何得知本診所 <span className="text-red-500">*</span>
@@ -1286,9 +1269,9 @@ const PatientForm: React.FC = () => {
                 </select>
               </div>
             </div>
-            
+
             <h2 className="text-xl font-bold mb-4">居住地區</h2>
-            
+
             {/* 區域選擇器 */}
             <div className="mb-6">
               <RegionSelector
@@ -1303,9 +1286,9 @@ const PatientForm: React.FC = () => {
                 readOnly={fieldsReadOnly}
               />
             </div>
-            
+
             <h2 className="text-xl font-bold mb-4">健康資訊</h2>
-            
+
             {/* 健康資訊區塊 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               {/* 健康資訊選擇 */}
@@ -1336,7 +1319,7 @@ const PatientForm: React.FC = () => {
                   <option value="否">否</option>
                 </select>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   是否有藥物過敏 <span className="text-red-500">*</span>
@@ -1364,7 +1347,7 @@ const PatientForm: React.FC = () => {
                   <option value="否">否</option>
                 </select>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   是否有食物過敏 <span className="text-red-500">*</span>
@@ -1393,7 +1376,7 @@ const PatientForm: React.FC = () => {
                 </select>
               </div>
             </div>
-            
+
             {/* 基礎疾病詳細選項 */}
             {hasBasicDisease && (
               <div className="mb-6 p-4 bg-gray-50 rounded-md border border-gray-200">
@@ -1402,19 +1385,19 @@ const PatientForm: React.FC = () => {
                   {referenceData.basic_diseases
                     .filter(disease => !disease.includes('我沒有'))
                     .map((disease, idx) => (
-                    <label key={`basic_disease_${idx}`} className="inline-flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={formData.basic_diseases.includes(disease)}
-                        onChange={(e) => handleCheckboxChange('basic_diseases', disease, e.target.checked)}
-                        disabled={fieldsReadOnly}
-                        className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                      />
-                      <span className="ml-2 text-sm text-gray-700">{disease}</span>
-                    </label>
-                  ))}
+                      <label key={`basic_disease_${idx}`} className="inline-flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={formData.basic_diseases.includes(disease)}
+                          onChange={(e) => handleCheckboxChange('basic_diseases', disease, e.target.checked)}
+                          disabled={fieldsReadOnly}
+                          className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">{disease}</span>
+                      </label>
+                    ))}
                 </div>
-                
+
                 {/* 其他基礎疾病輸入框 */}
                 {formData.basic_diseases.includes('其他，請列明') && (
                   <div>
@@ -1436,7 +1419,7 @@ const PatientForm: React.FC = () => {
                 )}
               </div>
             )}
-            
+
             {/* 藥物過敏詳細選項 */}
             {hasDrugAllergy && (
               <div className="mb-6 p-4 bg-gray-50 rounded-md border border-gray-200">
@@ -1445,19 +1428,19 @@ const PatientForm: React.FC = () => {
                   {referenceData.drug_allergies
                     .filter(allergy => !allergy.includes('我沒有'))
                     .map((allergy, idx) => (
-                    <label key={`drug_allergy_${idx}`} className="inline-flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={formData.drug_allergies.includes(allergy)}
-                        onChange={(e) => handleCheckboxChange('drug_allergies', allergy, e.target.checked)}
-                        disabled={fieldsReadOnly}
-                        className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                      />
-                      <span className="ml-2 text-sm text-gray-700">{allergy}</span>
-                    </label>
-                  ))}
+                      <label key={`drug_allergy_${idx}`} className="inline-flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={formData.drug_allergies.includes(allergy)}
+                          onChange={(e) => handleCheckboxChange('drug_allergies', allergy, e.target.checked)}
+                          disabled={fieldsReadOnly}
+                          className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">{allergy}</span>
+                      </label>
+                    ))}
                 </div>
-                
+
                 {/* 其他藥物過敏輸入框 */}
                 {formData.drug_allergies.includes('其他藥物，請列明') && (
                   <div>
@@ -1479,7 +1462,7 @@ const PatientForm: React.FC = () => {
                 )}
               </div>
             )}
-            
+
             {/* 食物過敏詳細選項 */}
             {hasFoodAllergy && (
               <div className="mb-6 p-4 bg-gray-50 rounded-md border border-gray-200">
@@ -1488,19 +1471,19 @@ const PatientForm: React.FC = () => {
                   {referenceData.food_allergies
                     .filter(allergy => !allergy.includes('我沒有'))
                     .map((allergy, idx) => (
-                    <label key={`food_allergy_${idx}`} className="inline-flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={formData.food_allergies.includes(allergy)}
-                        onChange={(e) => handleCheckboxChange('food_allergies', allergy, e.target.checked)}
-                        disabled={fieldsReadOnly}
-                        className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                      />
-                      <span className="ml-2 text-sm text-gray-700">{allergy}</span>
-                    </label>
-                  ))}
+                      <label key={`food_allergy_${idx}`} className="inline-flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={formData.food_allergies.includes(allergy)}
+                          onChange={(e) => handleCheckboxChange('food_allergies', allergy, e.target.checked)}
+                          disabled={fieldsReadOnly}
+                          className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">{allergy}</span>
+                      </label>
+                    ))}
                 </div>
-                
+
                 {/* 其他食物過敏輸入框 */}
                 {formData.food_allergies.includes('其他食物，請列明') && (
                   <div>
@@ -1522,7 +1505,7 @@ const PatientForm: React.FC = () => {
                 )}
               </div>
             )}
-            
+
             {/* 備註欄位 */}
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1538,7 +1521,7 @@ const PatientForm: React.FC = () => {
                 placeholder="例如：偏好女醫師，懂英語，請準備輪椅"
               />
             </div>
-            
+
             {/* 主訴欄位 */}
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1554,10 +1537,10 @@ const PatientForm: React.FC = () => {
                 placeholder="請簡述您的不適或求診原因"
               />
             </div>
-            
+
             {/* 診所資訊 */}
             <h2 className="text-xl font-bold mb-4">診所資訊</h2>
-            
+
             {/* 醫師選擇 */}
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1584,7 +1567,7 @@ const PatientForm: React.FC = () => {
                 ))}
               </select>
             </div>
-            
+
             {/* 提交按鈕 */}
             <div className="flex justify-end">
               <button

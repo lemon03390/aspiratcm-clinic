@@ -50,7 +50,7 @@ const normalizeToDiagnosisItem = (item: any, prefix: string): DiagnosisItem | nu
     if (!item) {
       return null;
     }
-    
+
     if (typeof item === 'object' && item !== null) {
       return {
         code: item.code || `${prefix}-${Math.random().toString(36).substring(2, 9)}`,
@@ -75,7 +75,7 @@ const normalizeToArray = (items: any, prefix: string): DiagnosisItem[] => {
     if (!items) {
       return [];
     }
-    
+
     if (Array.isArray(items)) {
       return items
         .map(item => normalizeToDiagnosisItem(item, prefix))
@@ -98,36 +98,36 @@ const normalizeToArray = (items: any, prefix: string): DiagnosisItem[] => {
 const convertToTreeNodes = (items: any[]): TreeNode[] => {
   try {
     if (!items || !Array.isArray(items)) {
-     return [];
-     }
+      return [];
+    }
 
     // 分組診斷項目，以句點分隔的代碼為基礎
     const groupedItems: Record<string, any[]> = {};
-    
+
     items.forEach(item => {
       if (!item.code) {
         return;
       }
-      
+
       const codeSegments = item.code.split('.');
-      const parentCode = codeSegments.length > 1 
+      const parentCode = codeSegments.length > 1
         ? codeSegments.slice(0, codeSegments.length - 1).join('.') + '.'
         : '';
-      
+
       if (!groupedItems[parentCode]) {
         groupedItems[parentCode] = [];
       }
-      
+
       groupedItems[parentCode].push(item);
     });
-    
+
     // 遞迴構建樹結構
     const buildTree = (parentCode: string = ''): TreeNode[] => {
       const children = groupedItems[parentCode] || [];
       return children.map((item): TreeNode => {
         const fullCode = item.code;
         const hasChildren = groupedItems[fullCode + '.'];
-        
+
         return {
           label: item.name,
           value: fullCode,
@@ -136,7 +136,7 @@ const convertToTreeNodes = (items: any[]): TreeNode[] => {
         };
       });
     };
-    
+
     return buildTree();
   } catch (error) {
     console.error('轉換為樹結構失敗:', error);
@@ -150,7 +150,7 @@ const convertSearchToTreeNodes = (items: any[]): TreeNode[] => {
     if (!items || !Array.isArray(items)) {
       return [];
     }
-    
+
     return items.map(item => ({
       label: item.name,
       value: item.code,
@@ -181,23 +181,23 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
   } | null>(null);
 
   // 將已選擇的項目轉換為值陣列
-  const selectedModernDiseases = useMemo(() => 
-    diagnosisData.modernDiseases.map(item => item.code), 
+  const selectedModernDiseases = useMemo(() =>
+    diagnosisData.modernDiseases.map(item => item.code),
     [diagnosisData.modernDiseases]
   );
 
-  const selectedCmSyndromes = useMemo(() => 
-    diagnosisData.cmSyndromes.map(item => item.code), 
+  const selectedCmSyndromes = useMemo(() =>
+    diagnosisData.cmSyndromes.map(item => item.code),
     [diagnosisData.cmSyndromes]
   );
 
-  const selectedCmPrinciples = useMemo(() => 
-    diagnosisData.cmPrinciple.map(item => item.code), 
+  const selectedCmPrinciples = useMemo(() =>
+    diagnosisData.cmPrinciple.map(item => item.code),
     [diagnosisData.cmPrinciple]
   );
 
   // 使用統一的參考數據 hook
-  const { 
+  const {
     isLoading,
     error,
     searchReferenceData
@@ -241,7 +241,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
     try {
       // 獲取新增的值
       const newValues = values.filter(value => !selectedModernDiseases.includes(value));
-      
+
       // 處理新增的值
       if (newValues.length > 0) {
         // 對於每個新值，構建 DiagnosisItem
@@ -249,7 +249,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
           code,
           name: findNameByCode(code, 'modern-diseases') || code
         }));
-        
+
         setDiagnosisData(prev => ({
           ...prev,
           modernDiseases: [...prev.modernDiseases, ...newItems]
@@ -271,7 +271,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
     try {
       // 獲取新增的值
       const newValues = values.filter(value => !selectedCmSyndromes.includes(value));
-      
+
       // 處理新增的值
       if (newValues.length > 0) {
         // 對於每個新值，構建 DiagnosisItem
@@ -279,7 +279,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
           code,
           name: findNameByCode(code, 'cm-syndromes') || code
         }));
-        
+
         setDiagnosisData(prev => ({
           ...prev,
           cmSyndromes: [...prev.cmSyndromes, ...newItems]
@@ -301,7 +301,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
     try {
       // 獲取新增的值
       const newValues = values.filter(value => !selectedCmPrinciples.includes(value));
-      
+
       // 處理新增的值
       if (newValues.length > 0) {
         // 對於每個新值，構建 DiagnosisItem
@@ -309,7 +309,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
           code,
           name: findNameByCode(code, 'tcm-principles') || code
         }));
-        
+
         setDiagnosisData(prev => ({
           ...prev,
           cmPrinciple: [...prev.cmPrinciple, ...newItems]
@@ -338,11 +338,11 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
       if (!aiSuggestions) {
         return;
       }
-      
+
       const normalizedModernDiseases = normalizeToArray(aiSuggestions.modernDiseases, 'md');
       const normalizedCmSyndromes = normalizeToArray(aiSuggestions.cmSyndromes, 'cs');
       const normalizedCmPrinciple = normalizeToArray(aiSuggestions.cmPrinciple, 'cp');
-      
+
       setDiagnosisData(prev => ({
         modernDiseases: Array.isArray(prev.modernDiseases)
           ? [...prev.modernDiseases, ...normalizedModernDiseases]
@@ -354,7 +354,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
           ? [...prev.cmPrinciple, ...normalizedCmPrinciple]
           : [...normalizedCmPrinciple]
       }));
-      
+
       // 清空建議以避免重複應用
       setAiSuggestions(null);
     } catch (error) {
@@ -365,21 +365,21 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
   // 表單提交前確保資料安全
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       // 確保提交到父組件的資料一定是正確格式
       const safeDataToSubmit: DiagnosisData = {
-        modernDiseases: Array.isArray(diagnosisData.modernDiseases) 
-          ? diagnosisData.modernDiseases 
+        modernDiseases: Array.isArray(diagnosisData.modernDiseases)
+          ? diagnosisData.modernDiseases
           : [],
-        cmSyndromes: Array.isArray(diagnosisData.cmSyndromes) 
-          ? diagnosisData.cmSyndromes 
+        cmSyndromes: Array.isArray(diagnosisData.cmSyndromes)
+          ? diagnosisData.cmSyndromes
           : [],
-        cmPrinciple: Array.isArray(diagnosisData.cmPrinciple) 
-          ? diagnosisData.cmPrinciple 
+        cmPrinciple: Array.isArray(diagnosisData.cmPrinciple)
+          ? diagnosisData.cmPrinciple
           : []
       };
-      
+
       onSave(safeDataToSubmit);
     } catch (error) {
       console.error('提交診斷表單失敗:', error);
@@ -411,7 +411,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
     <DiagnosisErrorBoundary>
       <div className="bg-white p-4 rounded-md shadow">
         <h2 className="text-lg font-semibold mb-3 text-gray-800 border-b pb-2">中醫診斷</h2>
-        
+
         {isLoading ? (
           <div className="py-4 flex justify-center">
             <div className="animate-pulse flex space-x-2">
@@ -435,12 +435,12 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
                 allowClear={true}
                 treeDefaultExpandAll={false}
               />
-              
+
               {/* 已選擇項目顯示 */}
               <div className="flex flex-wrap gap-2 mt-2">
                 {diagnosisData.modernDiseases.map(item => (
-                  <div 
-                    key={item.code} 
+                  <div
+                    key={item.code}
                     className="flex items-center bg-blue-100 px-2 py-1 rounded"
                   >
                     <span>{item.name}</span>
@@ -448,7 +448,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
                 ))}
               </div>
             </div>
-            
+
             {/* 中醫辨證 - 多選 */}
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-600">中醫辨證（多選）</label>
@@ -461,12 +461,12 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
                 allowClear={true}
                 treeDefaultExpandAll={false}
               />
-              
+
               {/* 已選擇項目顯示 */}
               <div className="flex flex-wrap gap-2 mt-2">
                 {diagnosisData.cmSyndromes.map(item => (
-                  <div 
-                    key={item.code} 
+                  <div
+                    key={item.code}
                     className="flex items-center bg-blue-100 px-2 py-1 rounded"
                   >
                     <span>{item.name}</span>
@@ -474,7 +474,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
                 ))}
               </div>
             </div>
-            
+
             {/* 中醫治則 - 多選 */}
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-600">中醫治則（多選）</label>
@@ -487,12 +487,12 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
                 allowClear={true}
                 treeDefaultExpandAll={false}
               />
-              
+
               {/* 已選擇項目顯示 */}
               <div className="flex flex-wrap gap-2 mt-2">
                 {diagnosisData.cmPrinciple.map(item => (
-                  <div 
-                    key={item.code} 
+                  <div
+                    key={item.code}
                     className="flex items-center bg-blue-100 px-2 py-1 rounded"
                   >
                     <span>{item.name}</span>
@@ -500,18 +500,18 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
                 ))}
               </div>
             </div>
-            
+
             {/* AI 建議診斷區塊 */}
             <div className="mt-6 p-4 bg-gray-50 border border-gray-300 rounded-md">
               <div className="flex items-center mb-2">
                 <span className="text-gray-700 font-medium">🤖 AI 推薦診斷</span>
                 <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded">即將推出</span>
               </div>
-              
+
               <div className="text-gray-500 text-sm italic">
                 <p>未來將根據患者主訴與觀察資料，自動推薦適合的診斷選項。</p>
               </div>
-              
+
               {/* 模擬未來的 AI 建議 */}
               {aiSuggestions && (
                 <div className="mt-2 space-y-2">
@@ -521,21 +521,21 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
                       <span className="text-sm">{aiSuggestions.modernDiseases.map(item => item.name).join('、')}</span>
                     </div>
                   )}
-                  
+
                   {aiSuggestions.cmSyndromes && aiSuggestions.cmSyndromes.length > 0 && (
                     <div>
                       <span className="text-sm font-medium">中醫辨證：</span>
                       <span className="text-sm">{aiSuggestions.cmSyndromes.map(item => item.name).join('、')}</span>
                     </div>
                   )}
-                  
+
                   {aiSuggestions.cmPrinciple && aiSuggestions.cmPrinciple.length > 0 && (
                     <div>
                       <span className="text-sm font-medium">治則：</span>
                       <span className="text-sm">{aiSuggestions.cmPrinciple.map(item => item.name).join('、')}</span>
                     </div>
                   )}
-                  
+
                   <button
                     type="button"
                     className="mt-2 px-3 py-1 bg-green-500 text-white rounded-md text-sm hover:bg-green-600"
@@ -546,22 +546,22 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
                 </div>
               )}
             </div>
-            
+
             {/* AI 用藥建議區塊 - 新增 */}
             <div className="mt-6 p-4 bg-gray-50 border border-gray-300 rounded-md" id="ai-suggestions">
               <div className="flex items-center mb-2">
                 <span className="text-gray-700 font-medium">🌿 AI 用藥建議</span>
                 <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded">即將推出 🚀</span>
               </div>
-              
+
               <div className="text-gray-500 text-sm italic">
                 <p>未來將根據患者診斷資料，智能推薦適合的中藥處方。</p>
               </div>
-              
+
               {/* TODO: 在此處顯示 AI 用藥建議 */}
               {/* TODO: 點擊建議藥物時，將自動加入到 HerbalPrescriptionForm 的草藥列表中 */}
             </div>
-            
+
             <div className="flex justify-end">
               <button
                 type="submit"

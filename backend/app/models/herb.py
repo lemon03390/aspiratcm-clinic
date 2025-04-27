@@ -4,7 +4,7 @@ from sqlalchemy.dialects.postgresql import UUID
 import uuid
 from datetime import datetime
 
-from .base import Base
+from app.db.database import Base
 
 class Herb(Base):
     """中藥資料模型，包含單味藥與複方藥"""

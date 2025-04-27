@@ -21,6 +21,7 @@ const AiHerbSuggestions: React.FC<AiHerbSuggestionsProps> = ({
 }) => {
   const [suggestions, setSuggestions] = useState<AiSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [aiMode, setAiMode] = useState<'suggestions' | 'analysis'>('suggestions');
 
   // 當診斷變更時，獲取 AI 建議
   useEffect(() => {
@@ -32,18 +33,20 @@ const AiHerbSuggestions: React.FC<AiHerbSuggestionsProps> = ({
 
   // 獲取 AI 用藥建議
   const fetchAiSuggestions = async () => {
-    if (!onAddHerb) return; // 如果沒有處理函數，不進行請求
+    if (!onAddHerb) {
+      return; // 如果沒有處理函數，不進行請求
+    }
 
     setIsLoading(true);
     try {
       const modernDiagnosisStr = modernDiagnosis.join(',');
       const cmSyndromeStr = cmSyndrome.join(',');
-      
+
       const response = await aiApi.getRecommendations(
         modernDiagnosisStr,
         cmSyndromeStr
       );
-      
+
       setSuggestions(response.suggestions || []);
     } catch (error) {
       console.error('獲取 AI 用藥建議失敗:', error);
@@ -66,11 +69,26 @@ const AiHerbSuggestions: React.FC<AiHerbSuggestionsProps> = ({
         <span className="text-gray-700 font-medium">🌿 AI 用藥建議</span>
         <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded">即將推出 🚀</span>
       </div>
-      
+
       <div className="text-gray-500 text-sm italic">
         <p>未來將根據患者診斷資料，智能推薦適合的中藥處方。</p>
       </div>
-      
+
+      <div className="flex border-b mb-2">
+        <button
+          className={`px-3 py-1 ${aiMode === 'suggestions' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
+          onClick={() => setAiMode('suggestions')}
+        >
+          藥材建議
+        </button>
+        <button
+          className={`px-3 py-1 ${aiMode === 'analysis' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
+          onClick={() => setAiMode('analysis')}
+        >
+          處方分析
+        </button>
+      </div>
+
       {/* 顯示建議列表（當前版本為空） */}
       {isLoading ? (
         <div className="mt-2 flex items-center justify-center py-2">

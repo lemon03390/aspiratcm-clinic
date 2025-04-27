@@ -28,7 +28,7 @@ const apiClientWithRetry = async (
     try {
       const url = getBackendUrl(endpoint);
       console.log(`嘗試 ${method.toUpperCase()} 請求到: ${url}`);
-      
+
       let response;
       if (method.toLowerCase() === 'get') {
         response = await axios.get(url, {
@@ -54,7 +54,7 @@ const apiClientWithRetry = async (
       } else {
         throw new Error(`不支持的HTTP方法: ${method}`);
       }
-      
+
       return response.data;
     } catch (error) {
       const err = error as AxiosError;
@@ -118,7 +118,7 @@ export const medicalRecordApi = {
       throw error;
     }
   },
-  
+
   // 獲取單條醫療記錄詳情
   getRecordById: async (recordId: string) => {
     try {
@@ -129,7 +129,7 @@ export const medicalRecordApi = {
       throw error;
     }
   },
-  
+
   // 創建新醫療記錄
   createRecord: async (recordData: any) => {
     try {
@@ -140,7 +140,7 @@ export const medicalRecordApi = {
       throw error;
     }
   },
-  
+
   // 更新醫療記錄
   updateRecord: async (recordId: string, recordData: any) => {
     try {
@@ -165,7 +165,7 @@ export const patientApi = {
       throw error;
     }
   },
-  
+
   // 獲取患者詳情（通過ID）
   getPatientById: async (patientId: number) => {
     try {
@@ -176,7 +176,7 @@ export const patientApi = {
       throw error;
     }
   },
-  
+
   // 獲取患者詳情（通過電話號碼）
   getPatientByPhoneNumber: async (phoneNumber: string) => {
     try {
@@ -188,7 +188,44 @@ export const patientApi = {
       console.error(`獲取患者資料失敗，電話號碼: ${phoneNumber}:`, error);
       throw error;
     }
-  }
+  },
+
+  // 更新患者資料
+  updatePatient: async (patientId: number, updateData: any) => {
+    try {
+      console.log(`正在更新患者資料，患者ID: ${patientId}:`, updateData);
+      return await apiClientWithRetry('patch', `/patient_registration/${patientId}`, updateData);
+    } catch (error) {
+      console.error(`更新患者資料失敗，患者ID: ${patientId}:`, error);
+      throw error;
+    }
+  },
+
+  // 更新患者特殊標記
+  updatePatientMarkers: async (patientId: number, markers: {
+    is_troublesome: number;
+    is_contagious: number;
+    special_note: string;
+  }) => {
+    try {
+      const response = await fetch(`${getBackendUrl(`/patient_registration/${patientId}`)}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(markers),
+      });
+
+      if (!response.ok) {
+        throw new Error(`更新患者標記失敗: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('更新患者標記時出錯:', error);
+      throw error;
+    }
+  },
 };
 
 // 預約API
@@ -197,19 +234,19 @@ export const appointmentApi = {
   getWaitingList: async () => {
     try {
       console.log('正在從掛號系統獲取候診名單');
-      
+
       const endpoint = `/patient_registration/waiting-list`;
       console.log(`使用候診清單端點: ${endpoint}`);
       console.log(`完整 URL: ${getBackendUrl(endpoint)}`);
-      
+
       const response = await apiClientWithRetry('get', endpoint);
       console.log(`候診清單響應:`, response);
-      
+
       if (!Array.isArray(response)) {
         console.warn('候診名單響應不是數組格式:', response);
         return [];
       }
-      
+
       return response;
     } catch (error) {
       console.error('獲取候診名單失敗:', error);
@@ -292,7 +329,7 @@ export const diagnosisDataApi = {
       return [];
     }
   },
-  
+
   // 搜尋現代病名
   searchModernDiseases: async (query: string) => {
     try {
@@ -304,7 +341,7 @@ export const diagnosisDataApi = {
       return [];
     }
   },
-  
+
   // 搜尋中醫證候
   searchCMSyndromes: async (query: string) => {
     try {
@@ -316,7 +353,7 @@ export const diagnosisDataApi = {
       return [];
     }
   },
-  
+
   // 搜尋中醫治則
   searchTreatmentRules: async (query: string) => {
     try {
@@ -328,7 +365,7 @@ export const diagnosisDataApi = {
       return [];
     }
   },
-  
+
   // 搜尋中藥
   searchMedicines: async (query: string) => {
     try {
@@ -337,6 +374,27 @@ export const diagnosisDataApi = {
       return response?.data || [];
     } catch (error) {
       console.error(`搜尋中藥失敗: ${query}`, error);
+      return [];
+    }
+  },
+
+  // 獲取中藥粉末與飲片換算資料
+  getPowderRatioPrice: async () => {
+    try {
+      console.log('正在獲取中藥粉末與飲片換算資料');
+      const response = await apiClientWithRetry('get', '/herbs/powder-ratio-price');
+      return response?.data || [];
+    } catch (error) {
+      console.error('獲取中藥粉末與飲片換算資料失敗:', error);
+      // 如果 API 調用失敗，嘗試從本地數據獲取
+      try {
+        const response = await fetch('/data/powder_ratio_price.json');
+        if (response.ok) {
+          return await response.json();
+        }
+      } catch (localError) {
+        console.error('讀取本地中藥數據失敗:', localError);
+      }
       return [];
     }
   }

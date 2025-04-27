@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON, Date, Boolean, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
-from app.models.base import Base
+from app.db.database import Base
 from app.utils.time import now_hk
 
 class Patient(Base):
@@ -24,6 +24,11 @@ class Patient(Base):
     note = Column(Text, nullable=True)  # 患者備註
     chief_complaint = Column(Text, nullable=True)  # 主訴
     health_profile = Column(JSONB, nullable=True)  # 健康檔案 (統一存放患者健康初始資料)
+    
+    # 特殊患者標記
+    is_troublesome = Column(Integer, default=0)  # 麻煩症患者標記 0: 非麻煩症患者, 1: 麻煩症患者
+    is_contagious = Column(Integer, default=0)   # 傳染病患者標記 0: 非傳染病患者, 1: 傳染病患者
+    special_note = Column(Text, nullable=True)   # 特殊情況註記
     
     # 預約相關
     registration_datetime = Column(DateTime, default=lambda: now_hk())  # 掛號日期時間

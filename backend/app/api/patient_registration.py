@@ -77,6 +77,11 @@ class PatientBase(BaseModel):
     note: Optional[str] = Field(None, description="備註")
     chief_complaint: Optional[str] = Field(None, description="主訴")
     
+    # 特殊患者標記
+    is_troublesome: Optional[int] = Field(0, description="麻煩症患者標記 (0: 否, 1: 是)")
+    is_contagious: Optional[int] = Field(0, description="傳染病患者標記 (0: 否, 1: 是)")
+    special_note: Optional[str] = Field(None, description="特殊情況註記")
+    
     has_appointment: bool = Field(False, description="是否已有預約")
     doctor_id: Optional[int] = Field(None, description="應診醫師")
     data_source: str = Field(..., description="資料來源")
@@ -182,6 +187,11 @@ class PatientUpdate(BaseModel):
     note: Optional[str] = None
     chief_complaint: Optional[str] = None
     
+    # 特殊患者標記
+    is_troublesome: Optional[int] = None
+    is_contagious: Optional[int] = None
+    special_note: Optional[str] = None
+    
     doctor_id: Optional[int] = None
     data_source: Optional[str] = None
     
@@ -223,7 +233,7 @@ async def check_id_number(id_number: str, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"處理身份證號碼查詢時出錯: {str(e)}"
-        )
+        ) from e
 
 
 # 檢查患者是否存在（依據姓名和身份證號碼）
@@ -265,7 +275,7 @@ async def check_patient(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"查詢患者資料時出錯: {str(e)}"
-        )
+        ) from e
 
 
 # 獲取所有患者列表
@@ -280,54 +290,44 @@ async def get_patients(
 
 # 獲取候診患者列表
 @router.get("/waiting-list", response_model=List[dict])
-async def get_waiting_list(db: Session = Depends(get_db)):
-    """
-    從 waiting_list 表中獲取候診患者清單
-    """
+async def get_waiting_list(db: Session = Depends(get_db)) -> List[dict]:
+    """從 waiting_list 表中獲取候診患者清單，包含特殊患者標記"""
     try:
-        # 查詢等候清單
-        waiting_entries = (
-            db.query(WaitingList)
-            .order_by(WaitingList.created_at)
-            .all()
-        )
-
-        result = []
-        for entry in waiting_entries:
-            try:
-                # 嘗試取得醫師名稱
-                doctor_name = None
-                if entry.doctor_id:
-                    doctor = db.query(Doctor).filter(Doctor.id == entry.doctor_id).first()
-                    doctor_name = doctor.name if doctor else None
-
-                # 判斷是否首診
-                is_first_visit = not db.query(MedicalRecord).filter(
-                    MedicalRecord.patient_id == entry.patient_id
-                ).first()
-
-                # 建立返回格式
-                result.append({
-                    "id": str(entry.id),
-                    "patient_id": entry.patient_id,
-                    "name": entry.chinese_name or "",
-                    "registration_number": entry.registration_number or "",
-                    "isFirstVisit": is_first_visit,
-                    "waitingSince": entry.created_at.strftime("%H:%M") if entry.created_at else "00:00",
-                    "doctor_name": doctor_name or "",
-                    "status": "waiting"
-                })
-
-            except Exception as inner_err:
-                logger.error(f"處理候診患者 {entry.patient_id} 資料時出錯: {str(inner_err)}")
-                continue
-
+        waiting_entries = db.query(WaitingList).order_by(WaitingList.created_at).all()
+        result = process_waiting_entries(db, waiting_entries)
         logger.info(f"成功回傳候診清單，共 {len(result)} 名患者")
         return result
-
     except Exception as e:
         logger.error(f"獲取候診名單時發生錯誤: {str(e)}")
         return []  # 永不丟 422
+
+def get_patient_waiting_data(db: Session, entry: WaitingList) -> dict:
+    """從候診列表項目獲取患者詳細資訊"""
+    if not (patient := db.query(Patient).filter(Patient.id == entry.patient_id).first()):
+        return None
+    
+    return {
+        "waiting_id": entry.id,
+        "patient_id": patient.id,
+        "registration_number": patient.registration_number,
+        "chinese_name": patient.chinese_name,
+        "is_troublesome": patient.is_troublesome,
+        "is_contagious": patient.is_contagious,
+        "special_note": patient.special_note,
+        "doctor_id": entry.doctor_id,
+        "waiting_since": entry.created_at
+    }
+
+def process_waiting_entries(db: Session, entries: List[WaitingList]) -> List[dict]:
+    """處理候診清單條目，獲取患者詳細資訊"""
+    result = []
+    for entry in entries:
+        try:
+            if patient_data := get_patient_waiting_data(db, entry):
+                result.append(patient_data)
+        except Exception as inner_err:
+            logger.error(f"處理候診患者 {entry.patient_id} 資料時出錯: {str(inner_err)}")
+    return result
 
 
 # 通過掛號編號獲取患者
@@ -408,6 +408,11 @@ async def create_patient(patient: PatientCreate, db: Session = Depends(get_db)):
         "chief_complaint": patient.chief_complaint,
         "note": patient.note,
         
+        # 特殊患者標記
+        "is_troublesome": patient.is_troublesome,
+        "is_contagious": patient.is_contagious,
+        "special_note": patient.special_note,
+        
         # 其他相關信息
         "data_source": patient.data_source,
         "doctor_id": patient.doctor_id,
@@ -431,6 +436,9 @@ async def create_patient(patient: PatientCreate, db: Session = Depends(get_db)):
         food_allergies=patient.food_allergies,
         note=patient.note,
         chief_complaint=patient.chief_complaint,
+        is_troublesome=patient.is_troublesome,
+        is_contagious=patient.is_contagious,
+        special_note=patient.special_note,
         health_profile=health_profile,
         has_appointment=patient.has_appointment,
         doctor_id=patient.doctor_id,
@@ -462,11 +470,11 @@ async def create_patient(patient: PatientCreate, db: Session = Depends(get_db)):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="患者資料衝突，可能身份證號碼或掛號編號已存在"
-            )
+            ) from e
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"創建患者時出錯: {error_detail}"
-        )
+        ) from e
 
 
 # 更新患者資料
@@ -526,6 +534,14 @@ async def update_patient(
     if "chief_complaint" in update_data:
         current_profile["chief_complaint"] = update_data["chief_complaint"]
     
+    # 更新特殊患者標記
+    if "is_troublesome" in update_data:
+        current_profile["is_troublesome"] = update_data["is_troublesome"]
+    if "is_contagious" in update_data:
+        current_profile["is_contagious"] = update_data["is_contagious"]
+    if "special_note" in update_data:
+        current_profile["special_note"] = update_data["special_note"]
+    
     # 更新其他資料
     if "doctor_id" in update_data:
         current_profile["doctor_id"] = update_data["doctor_id"]
@@ -560,7 +576,7 @@ async def update_patient(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"更新患者資料時發生衝突: {str(e)}"
-        )
+        ) from e
 
 
 # 刪除患者
@@ -594,4 +610,4 @@ async def delete_from_waiting_list(patient_id: int, db: Session = Depends(get_db
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"移除候診患者時出錯: {str(e)}"
-        )
+        ) from e

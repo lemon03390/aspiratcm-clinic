@@ -1,7 +1,7 @@
 # backend/run_migration.py
 from app.db.database import engine
 from app.models import *  # 這一行不能少，必須觸發所有 model 加入 Base
-from app.models.base import Base
+from app.db.database import Base
 
 from sqlalchemy import inspect
 

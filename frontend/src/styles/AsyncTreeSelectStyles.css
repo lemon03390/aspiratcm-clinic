@@ -1,0 +1,14 @@
+/* AsyncTreeSelectStyles.css */
+.rc-tree-select {
+    width: 100%;
+}
+
+.rc-tree-select-tree {
+    margin-top: 4px;
+    max-height: 300px;
+    overflow: auto;
+}
+
+.rc-tree-select-dropdown {
+    z-index: 9999;
+}

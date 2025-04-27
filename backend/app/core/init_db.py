@@ -1,5 +1,5 @@
 from app.db.database import engine
-from app.models.base import Base
+from app.db.database import Base
 from app.models import doctor, appointment, patient  # 明確導入模型模組以觸發 SQLAlchemy 註冊
 
 def init_db():

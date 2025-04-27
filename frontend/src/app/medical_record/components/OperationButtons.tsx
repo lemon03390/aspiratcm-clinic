@@ -5,6 +5,7 @@ interface OperationButtonsProps {
   onPrint: () => void;
   onScheduleFollowUp: () => void;
   onNextPatient: () => void;
+  onCopyLastPrescription?: () => void;
   isLoading?: boolean;
 }
 
@@ -13,6 +14,7 @@ const OperationButtons: React.FC<OperationButtonsProps> = ({
   onPrint,
   onScheduleFollowUp,
   onNextPatient,
+  onCopyLastPrescription,
   isLoading = false
 }) => {
   return (
@@ -22,8 +24,8 @@ const OperationButtons: React.FC<OperationButtonsProps> = ({
           type="button"
           onClick={onSave}
           disabled={isLoading}
-          className={`px-5 py-2 rounded ${isLoading 
-            ? 'bg-blue-300 cursor-not-allowed' 
+          className={`px-5 py-2 rounded ${isLoading
+            ? 'bg-blue-300 cursor-not-allowed'
             : 'bg-blue-600 hover:bg-blue-700'} text-white`}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
@@ -31,13 +33,13 @@ const OperationButtons: React.FC<OperationButtonsProps> = ({
           </svg>
           {isLoading ? '保存中...' : '保存病歷'}
         </button>
-        
+
         <button
           type="button"
           onClick={onPrint}
           disabled={isLoading}
-          className={`px-5 py-2 rounded ${isLoading 
-            ? 'bg-green-300 cursor-not-allowed' 
+          className={`px-5 py-2 rounded ${isLoading
+            ? 'bg-green-300 cursor-not-allowed'
             : 'bg-green-600 hover:bg-green-700'} text-white`}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
@@ -45,13 +47,13 @@ const OperationButtons: React.FC<OperationButtonsProps> = ({
           </svg>
           列印藥方
         </button>
-        
+
         <button
           type="button"
           onClick={onScheduleFollowUp}
           disabled={isLoading}
-          className={`px-5 py-2 rounded ${isLoading 
-            ? 'bg-purple-300 cursor-not-allowed' 
+          className={`px-5 py-2 rounded ${isLoading
+            ? 'bg-purple-300 cursor-not-allowed'
             : 'bg-purple-600 hover:bg-purple-700'} text-white`}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
@@ -59,13 +61,13 @@ const OperationButtons: React.FC<OperationButtonsProps> = ({
           </svg>
           預約覆診
         </button>
-        
+
         <button
           type="button"
           onClick={onNextPatient}
           disabled={isLoading}
-          className={`px-5 py-2 rounded ${isLoading 
-            ? 'bg-gray-300 cursor-not-allowed' 
+          className={`px-5 py-2 rounded ${isLoading
+            ? 'bg-gray-300 cursor-not-allowed'
             : 'bg-gray-600 hover:bg-gray-700'} text-white`}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
@@ -74,6 +76,19 @@ const OperationButtons: React.FC<OperationButtonsProps> = ({
           </svg>
           下一位患者
         </button>
+
+        {onCopyLastPrescription && (
+          <button
+            type="button"
+            onClick={onCopyLastPrescription}
+            className="py-2 px-4 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+            title="複製上次處方"
+          >
+            <span className="flex items-center">
+              複製上次處方
+            </span>
+          </button>
+        )}
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 import { debounce } from 'lodash';
 import TreeSelect from 'rc-tree-select';
-import 'rc-tree-select/assets/index.css';
 import React, { useCallback, useEffect, useState } from 'react';
+import '../../../styles/AsyncTreeSelectStyles.css';
 
 export interface TreeNode {
   label: string;
@@ -49,7 +49,7 @@ const AsyncTreeSelect: React.FC<AsyncTreeSelectProps> = ({
       if (!searchTerm || searchTerm.length < 2) {
         return;
       }
-      
+
       setIsLoading(true);
       try {
         const data = await loadData(searchTerm);

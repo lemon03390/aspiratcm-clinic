@@ -1,43 +1,57 @@
+import { debounce } from 'lodash';
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react';
 import { diagnosisDataApi } from '../utils/api';
 import AsyncSelect, { SelectOption } from './AsyncSelect';
 
+// 庫存狀態枚舉
+export enum InventoryStatus {
+  NORMAL = 'normal',
+  LOW = 'low',
+  OUT_OF_STOCK = 'out_of_stock',
+  UNKNOWN = 'unknown'
+}
+
 // 中藥數據接口
 interface Herb {
-  id: string;
+  id?: string;
   code: string;
   name: string;
   brand: string;
   concentration_ratio: number;
+  conversion_ratio?: number;
   decoction_equivalent_per_g: number;
+  price_per_gram: number;
   unit: string;
-  quantity_per_bottle: number;
-  price: number;
-  currency: string;
   is_compound: boolean;
-  aliases: string[];
-  ingredients?: Array<{name: string, amount: number}>;
+  registration_code?: string;
+  ingredients?: Array<{ name: string; amount: number }>;
+  aliases?: string[];
 }
 
 // 處方藥物項目
 interface HerbItem {
   id: string; // 用於唯一識別每一行
-  name: string;
   code: string;
-  amount: string; // 藥粉量（克）
-  decoction_amount?: string; // 飲片量（克）
-  is_compound?: boolean;
-  brand?: string;
-  price?: number;
-  unit?: string;
-  quantity_per_bottle?: number;
-  currency?: string;
-  source?: string; // 新增：藥材來源，可以是 'manual' 或 'AI_suggested'
+  name: string;
+  brand: string;
+  powder_amount: string; // 藥粉量（克）
+  decoction_amount: string; // 飲片量（克）
+  price_per_gram: number;
+  total_price: number;
+  unit: string;
+  is_compound: boolean;
+  registration_code?: string;
+  ingredients?: Array<{ name: string; amount: number }>;
+  concentration_ratio: number;
+  decoction_equivalent_per_g: number;
+  inventory_status: InventoryStatus;
+  source?: string; // 可以是 'manual' 或 'AI_suggested'
 }
 
 interface HerbalPrescriptionData {
   herbs: HerbItem[];
   instructions: string; // 服法說明
+  total_price: number;
 }
 
 interface InventoryCheckResult {
@@ -46,8 +60,6 @@ interface InventoryCheckResult {
   has_sufficient_stock: boolean;
   available_amount: number;
   required_amount: number;
-  quantity_per_bottle: number;
-  current_bottles: number;
 }
 
 interface HerbalPrescriptionFormProps {
@@ -59,50 +71,105 @@ interface HerbalPrescriptionFormProps {
 const HerbalPrescriptionForm = forwardRef<
   { addHerb: (herbData: any) => void },
   HerbalPrescriptionFormProps
->(({ initialValues = { herbs: [], instructions: '' }, onSave }, ref) => {
-  const [prescription, setPrescription] = useState<HerbalPrescriptionData>({
-    herbs: initialValues.herbs.length > 0 
-      ? initialValues.herbs.map(herb => ({
-          ...herb,
-          code: herb.code || '', // 確保每個藥材都有 code 屬性
-          source: herb.source || 'manual'
-        }))
-      : [{ id: '0', name: '', code: '', amount: '', source: 'manual' }],
-    instructions: initialValues.instructions || ''
-  });
+>(({ initialValues, onSave }, ref) => {
+  const defaultPrescription: HerbalPrescriptionData = {
+    herbs: [],
+    instructions: '',
+    total_price: 0
+  };
+
+  const [prescription, setPrescription] = useState<HerbalPrescriptionData>(
+    initialValues ||
+    {
+      ...defaultPrescription,
+      herbs: [createEmptyHerbItem()]
+    }
+  );
+
   const [herbOptions, setHerbOptions] = useState<Herb[]>([]);
   const [searchLoading, setSearchLoading] = useState<boolean>(false);
   const [inventoryStatus, setInventoryStatus] = useState<Record<string, InventoryCheckResult>>({});
-  const [showPriceInfo, setShowPriceInfo] = useState<boolean>(false);
-  
-  // 計算處方總價
-  const totalPrice = useMemo(() => {
-    return prescription.herbs.reduce((sum, herb) => {
-      if (herb.price && herb.amount) {
-        // 計算需要的瓶數（向上取整）
-        const amountInG = parseFloat(herb.amount) || 0;
-        const bottleSize = herb.quantity_per_bottle || 100;
-        const bottlesNeeded = Math.ceil(amountInG / bottleSize);
-        
-        return sum + (bottlesNeeded * (herb.price || 0));
+  const [showPriceInfo, setShowPriceInfo] = useState<boolean>(true);
+  const [allHerbs, setAllHerbs] = useState<Herb[]>([]);
+  const [isLoadingHerbs, setIsLoadingHerbs] = useState<boolean>(false);
+
+  // 創建空白藥物項目
+  function createEmptyHerbItem(): HerbItem {
+    return {
+      id: Date.now().toString(),
+      code: '',
+      name: '',
+      brand: '',
+      powder_amount: '',
+      decoction_amount: '',
+      price_per_gram: 0,
+      total_price: 0,
+      unit: 'g',
+      is_compound: false,
+      concentration_ratio: 1,
+      decoction_equivalent_per_g: 1,
+      inventory_status: InventoryStatus.UNKNOWN,
+      source: 'manual'
+    };
+  }
+
+  // 載入所有中藥資料
+  useEffect(() => {
+    const loadHerbs = async () => {
+      setIsLoadingHerbs(true);
+      try {
+        const herbs = await diagnosisDataApi.getPowderRatioPrice();
+        setAllHerbs(herbs);
+        console.log('載入中藥資料成功，共', herbs.length, '筆');
+      } catch (error) {
+        console.error('載入中藥資料失敗:', error);
+      } finally {
+        setIsLoadingHerbs(false);
       }
-      return sum;
+    };
+
+    loadHerbs();
+  }, []);
+
+  // 計算處方總價
+  useEffect(() => {
+    const total = prescription.herbs.reduce((sum, herb) => {
+      return sum + herb.total_price;
     }, 0);
+
+    setPrescription(prev => ({
+      ...prev,
+      total_price: total
+    }));
   }, [prescription.herbs]);
-  
+
   // 搜尋中藥名稱
   const searchMedicines = async (searchTerm: string): Promise<SelectOption[]> => {
     if (!searchTerm || searchTerm.length < 1) {
       return [];
     }
-    
+
     setSearchLoading(true);
     try {
+      // 先從本地已載入的數據搜尋
+      if (allHerbs.length > 0) {
+        const filteredHerbs = allHerbs.filter(herb =>
+          herb.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (herb.aliases?.some(alias => alias.toLowerCase().includes(searchTerm.toLowerCase())))
+        );
+
+        return filteredHerbs.map(herb => ({
+          label: herb.name,
+          value: herb.code,
+          data: herb
+        }));
+      }
+
+      // 如果本地數據未載入，則調用API
       const results = await diagnosisDataApi.searchMedicines(searchTerm);
-      
-      // 將搜尋結果轉換為選項格式，只顯示中文名稱
+
       return results.map(med => ({
-        label: med.name, // 只顯示中文名稱
+        label: med.name,
         value: med.code,
         data: med
       }));
@@ -113,7 +180,7 @@ const HerbalPrescriptionForm = forwardRef<
       setSearchLoading(false);
     }
   };
-  
+
   // 檢查庫存狀態
   const checkInventory = async (herbCode: string, requiredAmount: number) => {
     try {
@@ -127,39 +194,68 @@ const HerbalPrescriptionForm = forwardRef<
           required_powder_amount: requiredAmount
         }),
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setInventoryStatus(prev => ({
           ...prev,
           [herbCode]: data
         }));
+
+        // 更新藥材的庫存狀態
+        setPrescription(prev => ({
+          ...prev,
+          herbs: prev.herbs.map(herb => {
+            if (herb.code === herbCode) {
+              let status = InventoryStatus.NORMAL;
+              if (data.has_sufficient_stock === false) {
+                status = data.available_amount > 0 ? InventoryStatus.LOW : InventoryStatus.OUT_OF_STOCK;
+              }
+              return {
+                ...herb,
+                inventory_status: status
+              };
+            }
+            return herb;
+          })
+        }));
       }
     } catch (error) {
       console.error('Error checking inventory:', error);
     }
   };
-  
+
+  // 使用 debounce 延遲庫存檢查，避免頻繁請求
+  const debouncedCheckInventory = useMemo(
+    () => debounce((code: string, amount: number) => checkInventory(code, amount), 500),
+    []
+  );
+
   // 監聽藥品份量變化，自動檢查庫存
   useEffect(() => {
     prescription.herbs.forEach(herb => {
-      if (herb.code && herb.amount) {
-        const amount = parseFloat(herb.amount);
+      if (herb.code && herb.powder_amount) {
+        const amount = parseFloat(herb.powder_amount);
         if (!isNaN(amount) && amount > 0) {
-          checkInventory(herb.code, amount);
+          debouncedCheckInventory(herb.code, amount);
         }
       }
     });
-  }, [prescription.herbs]);
-  
+
+    // 清除 debounce
+    return () => {
+      debouncedCheckInventory.cancel();
+    };
+  }, [prescription.herbs, debouncedCheckInventory]);
+
   // 處理新增藥材行
   const handleAddHerb = () => {
     setPrescription(prev => ({
       ...prev,
-      herbs: [...prev.herbs, { id: Date.now().toString(), name: '', code: '', amount: '', source: 'manual' }]
+      herbs: [...prev.herbs, createEmptyHerbItem()]
     }));
   };
-  
+
   // 處理刪除藥材行
   const handleRemoveHerb = (id: string) => {
     setPrescription(prev => ({
@@ -167,96 +263,166 @@ const HerbalPrescriptionForm = forwardRef<
       herbs: prev.herbs.filter(herb => herb.id !== id)
     }));
   };
-  
+
   // 處理中藥選擇
   const handleHerbSelection = (id: string, selectedItems: SelectOption[]) => {
     if (selectedItems.length === 0) {
       return;
     }
-    
+
     const selectedOption = selectedItems[0];
-    const herbData = selectedOption.data;
-    
+    const herbData = selectedOption.data as Herb;
+
     if (!herbData) {
       return;
     }
-    
+
     setPrescription(prev => ({
       ...prev,
-      herbs: prev.herbs.map(item => 
-        item.id === id ? { 
-          ...item, 
-          name: herbData.name,
-          code: herbData.code,
-          brand: herbData.brand,
-          is_compound: herbData.is_compound,
-          unit: herbData.unit,
-          price: herbData.price,
-          quantity_per_bottle: herbData.quantity_per_bottle,
-          currency: herbData.currency,
-          source: item.source || 'manual', // 保持現有來源，或設為 manual
-        } : item
-      )
+      herbs: prev.herbs.map(item => {
+        if (item.id === id) {
+          const newHerb: HerbItem = {
+            ...item,
+            code: herbData.code,
+            name: herbData.name,
+            brand: herbData.brand,
+            is_compound: herbData.is_compound || false,
+            ingredients: herbData.ingredients,
+            registration_code: herbData.registration_code,
+            concentration_ratio: herbData.concentration_ratio || 1,
+            decoction_equivalent_per_g: herbData.decoction_equivalent_per_g || 1,
+            price_per_gram: herbData.price_per_gram || 0,
+            unit: herbData.unit || 'g',
+            source: item.source || 'manual',
+          };
+
+          // 如果已經輸入了飲片量，則計算藥粉量
+          if (item.decoction_amount) {
+            const decoctionAmount = parseFloat(item.decoction_amount);
+            if (!isNaN(decoctionAmount)) {
+              const powderAmount = calculatePowderAmount(
+                decoctionAmount,
+                herbData.decoction_equivalent_per_g,
+                herbData.concentration_ratio
+              );
+              newHerb.powder_amount = powderAmount.toFixed(1);
+              // 計算價格
+              newHerb.total_price = powderAmount * herbData.price_per_gram;
+            }
+          }
+
+          // 如果已經輸入了藥粉量，則計算飲片量和價格
+          if (item.powder_amount && !item.decoction_amount) {
+            const powderAmount = parseFloat(item.powder_amount);
+            if (!isNaN(powderAmount)) {
+              const decoctionAmount = calculateDecoctionAmount(
+                powderAmount,
+                herbData.decoction_equivalent_per_g,
+                herbData.concentration_ratio
+              );
+              newHerb.decoction_amount = decoctionAmount.toFixed(1);
+              // 計算價格
+              newHerb.total_price = powderAmount * herbData.price_per_gram;
+            }
+          }
+
+          return newHerb;
+        }
+        return item;
+      })
     }));
   };
-  
-  // 處理藥材份量輸入（藥粉量）
-  const handleHerbAmountChange = (id: string, amount: string) => {
+
+  // 計算藥粉量
+  const calculatePowderAmount = (
+    decoctionAmount: number,
+    decoctionEquivalentPerG: number,
+    concentrationRatio: number
+  ): number => {
+    // 藥粉量 (g) = (飲片量 (g) ÷ decoction_equivalent_per_g) × concentration_ratio
+    return (decoctionAmount / decoctionEquivalentPerG) * concentrationRatio;
+  };
+
+  // 計算飲片量
+  const calculateDecoctionAmount = (
+    powderAmount: number,
+    decoctionEquivalentPerG: number,
+    concentrationRatio: number
+  ): number => {
+    // 飲片量 (g) = (藥粉量 (g) ÷ concentration_ratio) × decoction_equivalent_per_g
+    return (powderAmount / concentrationRatio) * decoctionEquivalentPerG;
+  };
+
+  // 處理藥材藥粉量輸入（計算飲片量與價格）
+  const handlePowderAmountChange = (id: string, amount: string) => {
     setPrescription(prev => ({
       ...prev,
       herbs: prev.herbs.map(herb => {
         if (herb.id === id) {
           const numAmount = parseFloat(amount) || 0;
-          // 查找對應的藥材信息計算飲片量
-          const selectedHerb = herbOptions.find(h => h.code === herb.code);
           let decoctionAmount = '';
-          
-          if (selectedHerb && numAmount > 0) {
-            // 計算飲片量 = 藥粉量 × 飲片等效值
-            const decoctionValue = numAmount * (selectedHerb.decoction_equivalent_per_g || 1);
+          let totalPrice = 0;
+
+          if (numAmount > 0) {
+            // 計算飲片量
+            const decoctionValue = calculateDecoctionAmount(
+              numAmount,
+              herb.decoction_equivalent_per_g,
+              herb.concentration_ratio
+            );
             decoctionAmount = decoctionValue.toFixed(1);
+
+            // 計算價格
+            totalPrice = numAmount * herb.price_per_gram;
           }
-          
-          return { 
-            ...herb, 
-            amount, 
-            decoction_amount: decoctionAmount 
+
+          return {
+            ...herb,
+            powder_amount: amount,
+            decoction_amount: decoctionAmount,
+            total_price: totalPrice
           };
         }
         return herb;
       })
     }));
   };
-  
-  // 處理飲片量輸入（反向計算藥粉量）
-  const handleDecoctionAmountChange = (id: string, decoctionAmount: string) => {
+
+  // 處理飲片量輸入（計算藥粉量與價格）
+  const handleDecoctionAmountChange = (id: string, amount: string) => {
     setPrescription(prev => ({
       ...prev,
       herbs: prev.herbs.map(herb => {
         if (herb.id === id) {
-          const numDecoction = parseFloat(decoctionAmount) || 0;
-          // 查找對應的藥材信息計算藥粉量
-          const selectedHerb = herbOptions.find(h => h.code === herb.code);
+          const numAmount = parseFloat(amount) || 0;
           let powderAmount = '';
-          
-          if (selectedHerb && numDecoction > 0) {
-            // 計算藥粉量 = 飲片量 ÷ 飲片等效值
-            const decocEq = selectedHerb.decoction_equivalent_per_g || 1;
-            const powderValue = numDecoction / decocEq;
+          let totalPrice = 0;
+
+          if (numAmount > 0) {
+            // 計算藥粉量
+            const powderValue = calculatePowderAmount(
+              numAmount,
+              herb.decoction_equivalent_per_g,
+              herb.concentration_ratio
+            );
             powderAmount = powderValue.toFixed(1);
+
+            // 計算價格
+            totalPrice = powderValue * herb.price_per_gram;
           }
-          
-          return { 
-            ...herb, 
-            amount: powderAmount, 
-            decoction_amount: decoctionAmount 
+
+          return {
+            ...herb,
+            decoction_amount: amount,
+            powder_amount: powderAmount,
+            total_price: totalPrice
           };
         }
         return herb;
       })
     }));
   };
-  
+
   // 處理服法說明輸入
   const handleInstructionsChange = (instructions: string) => {
     setPrescription(prev => ({
@@ -264,52 +430,199 @@ const HerbalPrescriptionForm = forwardRef<
       instructions
     }));
   };
-  
+
+  const processPrescriptionData = () => {
+    return {
+      herbs: prescription.herbs.map(herb => ({
+        id: herb.id,
+        code: herb.code,
+        name: herb.name,
+        brand: herb.brand,
+        powder_amount: herb.powder_amount,
+        decoction_amount: herb.decoction_amount,
+        price_per_gram: herb.price_per_gram,
+        total_price: herb.total_price,
+        unit: herb.unit,
+        is_compound: herb.is_compound,
+        concentration_ratio: herb.concentration_ratio,
+        decoction_equivalent_per_g: herb.decoction_equivalent_per_g,
+        inventory_status: herb.inventory_status,
+        source: herb.source,
+        ingredients: herb.ingredients
+      })),
+      instructions: prescription.instructions,
+      total_price: prescription.total_price
+    };
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(prescription);
+    onSave(processPrescriptionData());
   };
-  
+
   // 暴露方法給父組件
   useImperativeHandle(ref, () => ({
     addHerb: (herbData: any) => {
-      const newHerb = {
+      const newHerb: HerbItem = {
         id: Date.now().toString(),
-        name: herbData.name,
-        code: herbData.code || '', // 確保必填字段有默認值
-        amount: herbData.recommended_amount || '',
-        brand: herbData.brand,
-        is_compound: herbData.is_compound,
-        unit: herbData.unit,
-        quantity_per_bottle: herbData.quantity_per_bottle,
-        currency: herbData.currency,
+        code: herbData.code || '',
+        name: herbData.name || '',
+        brand: herbData.brand || '',
+        powder_amount: herbData.recommended_amount || '',
+        decoction_amount: '',
+        price_per_gram: herbData.price_per_gram || 0,
+        total_price: 0,
+        unit: herbData.unit || 'g',
+        is_compound: herbData.is_compound || false,
+        concentration_ratio: herbData.concentration_ratio || 1,
+        decoction_equivalent_per_g: herbData.decoction_equivalent_per_g || 1,
+        inventory_status: InventoryStatus.UNKNOWN,
         source: herbData.source || 'AI_suggested'
       };
-      
+
+      // 如果有推薦劑量，計算相關數值
+      if (newHerb.powder_amount) {
+        const powderAmount = parseFloat(newHerb.powder_amount);
+        if (!isNaN(powderAmount)) {
+          // 計算飲片量
+          const decoctionAmount = calculateDecoctionAmount(
+            powderAmount,
+            newHerb.decoction_equivalent_per_g,
+            newHerb.concentration_ratio
+          );
+          newHerb.decoction_amount = decoctionAmount.toFixed(1);
+
+          // 計算價格
+          newHerb.total_price = powderAmount * newHerb.price_per_gram;
+        }
+      }
+
       setPrescription(prev => ({
         ...prev,
         herbs: [...prev.herbs, newHerb]
       }));
     }
   }));
-  
+
   // 將藥物項目轉換為 AsyncSelect 選項
   const getSelectedOption = (herb: HerbItem): SelectOption[] => {
     if (!herb.name || !herb.code) {
       return [];
     }
-    
+
     return [{
       label: herb.name,
       value: herb.code,
       data: herb
     }];
   };
-  
+
+  // 獲取庫存狀態的樣式
+  const getInventoryStatusStyle = (status: InventoryStatus) => {
+    switch (status) {
+      case InventoryStatus.NORMAL:
+        return 'bg-green-100 text-green-800';
+      case InventoryStatus.LOW:
+        return 'bg-yellow-100 text-yellow-800';
+      case InventoryStatus.OUT_OF_STOCK:
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  // 獲取庫存狀態的文字
+  const getInventoryStatusText = (status: InventoryStatus) => {
+    switch (status) {
+      case InventoryStatus.NORMAL:
+        return '庫存正常';
+      case InventoryStatus.LOW:
+        return '庫存偏低';
+      case InventoryStatus.OUT_OF_STOCK:
+        return '庫存不足';
+      default:
+        return '庫存狀態未知';
+    }
+  };
+
+  const handleSaveTemplate = () => {
+    try {
+      if (prescription.herbs.length === 0) {
+        alert('處方中沒有藥材，無法儲存模板');
+        return;
+      }
+
+      // 提示用戶輸入模板名稱
+      const templateName = prompt('請輸入處方模板名稱:');
+      if (!templateName) {
+        return;
+      }
+
+      // 獲取現有模板
+      const existingTemplatesJson = localStorage.getItem('prescription_templates');
+      const existingTemplates = existingTemplatesJson ? JSON.parse(existingTemplatesJson) : [];
+
+      // 添加新模板
+      const newTemplate = {
+        id: Date.now().toString(),
+        name: templateName,
+        herbs: prescription.herbs,
+        instructions: prescription.instructions,
+        created_at: new Date().toISOString()
+      };
+
+      // 保存更新後的模板列表
+      localStorage.setItem('prescription_templates', JSON.stringify([...existingTemplates, newTemplate]));
+      alert('處方模板儲存成功');
+    } catch (error) {
+      console.error('儲存處方模板失敗:', error);
+      alert('儲存處方模板失敗');
+    }
+  };
+
+  const handleLoadTemplate = () => {
+    try {
+      // 獲取現有模板
+      const existingTemplatesJson = localStorage.getItem('prescription_templates');
+      if (!existingTemplatesJson) {
+        alert('沒有儲存的處方模板');
+        return;
+      }
+
+      const templates = JSON.parse(existingTemplatesJson);
+      if (templates.length === 0) {
+        alert('沒有儲存的處方模板');
+        return;
+      }
+
+      // 簡單實現：顯示一個選擇列表
+      const templateNames = templates.map((t: any, index: number) => `${index + 1}. ${t.name}`).join('\n');
+      const selectedIndex = parseInt(prompt(`請選擇要載入的模板號碼:\n${templateNames}`) || '0') - 1;
+
+      if (isNaN(selectedIndex) || selectedIndex < 0 || selectedIndex >= templates.length) {
+        alert('選擇無效');
+        return;
+      }
+
+      // 載入選擇的模板
+      const selectedTemplate = templates[selectedIndex];
+      setPrescription({
+        herbs: selectedTemplate.herbs,
+        instructions: selectedTemplate.instructions,
+        total_price: selectedTemplate.herbs.reduce((sum: number, herb: any) => sum + herb.total_price, 0)
+      });
+
+      alert('處方模板載入成功');
+    } catch (error) {
+      console.error('載入處方模板失敗:', error);
+      alert('載入處方模板失敗');
+    }
+  };
+
   return (
     <div className="bg-white p-4 rounded-md shadow">
       <h2 className="text-lg font-semibold mb-3 text-gray-800 border-b pb-2">中藥處方</h2>
-      
+
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* 藥材列表 */}
         <div className="border rounded-md overflow-hidden">
@@ -319,22 +632,26 @@ const HerbalPrescriptionForm = forwardRef<
             <div className="col-span-2">藥粉量 (g)</div>
             <div className="col-span-2">飲片量 (g)</div>
             <div className="col-span-2">品牌/規格</div>
-            <div className="col-span-2">庫存狀態</div>
-            <div className="col-span-1 text-center">操作</div>
+            <div className="col-span-1">單價 ($/g)</div>
+            <div className="col-span-1">小計 ($)</div>
+            <div className="col-span-1">操作</div>
           </div>
-          
+
           {/* 藥材行 */}
           <div className="divide-y">
-            {prescription.herbs.map((herb, index) => {
-              const inventoryCheck = herb.code ? inventoryStatus[herb.code] : null;
-              const isInventorySufficient = inventoryCheck?.has_sufficient_stock;
+            {prescription.herbs.map((herb) => {
               const isAiSuggested = herb.source === 'AI_suggested';
-              
+              const inventoryStatusClass = getInventoryStatusStyle(herb.inventory_status);
+              const inventoryStatusText = getInventoryStatusText(herb.inventory_status);
+
               return (
-                <div key={herb.id} className={`grid grid-cols-12 p-2 items-center text-sm ${isAiSuggested ? 'bg-green-50' : ''}`}>
-                  <div className="col-span-3 pr-2 flex items-center">
+                <div
+                  key={herb.id}
+                  className={`grid grid-cols-12 p-2 items-center text-sm ${isAiSuggested ? 'bg-green-50' : ''}`}
+                >
+                  <div className="col-span-3 pr-2 relative">
                     {isAiSuggested && (
-                      <span className="mr-1 text-xs bg-green-100 text-green-800 px-1 py-0.5 rounded">AI</span>
+                      <span className="absolute -left-1 -top-1 z-10 text-xs bg-green-500 text-white px-1 py-0.5 rounded-full">AI</span>
                     )}
                     <AsyncSelect
                       placeholder="搜尋中藥名稱"
@@ -345,76 +662,90 @@ const HerbalPrescriptionForm = forwardRef<
                       className="w-full"
                       disabled={false}
                     />
+
+                    {/* 複方成分顯示 */}
+                    {herb.is_compound && herb.ingredients && herb.ingredients.length > 0 && (
+                      <div className="mt-1 p-1 bg-gray-50 text-xs rounded-md">
+                        <div className="font-medium text-gray-700">複方成分:</div>
+                        <ul className="list-disc pl-3">
+                          {herb.ingredients.map((ingredient, idx) => (
+                            <li key={idx}>
+                              {ingredient.name} {ingredient.amount}g
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
+
                   <div className="col-span-2 pr-2">
                     <input
                       type="text"
-                      value={herb.amount}
-                      onChange={(e) => handleHerbAmountChange(herb.id, e.target.value)}
-                      placeholder="克數"
+                      value={herb.powder_amount}
+                      onChange={(e) => handlePowderAmountChange(herb.id, e.target.value)}
+                      placeholder="藥粉量"
                       className="w-full p-2 border border-gray-300 rounded-md"
                     />
                   </div>
+
                   <div className="col-span-2 pr-2">
                     <input
                       type="text"
-                      value={herb.decoction_amount || ''}
+                      value={herb.decoction_amount}
                       onChange={(e) => handleDecoctionAmountChange(herb.id, e.target.value)}
-                      placeholder="飲片換算量"
+                      placeholder="飲片量"
                       className="w-full p-2 border border-gray-300 rounded-md"
                     />
                   </div>
-                  <div className="col-span-2 pr-2 text-xs text-gray-600">
-                    {herb.brand && (
-                      <div>
-                        <p><span className="font-medium">品牌:</span> {herb.brand}</p>
-                        {showPriceInfo && herb.price && (
-                          <>
-                            <p><span className="font-medium">價格:</span> {herb.price} {herb.currency}/瓶</p>
-                            <p><span className="font-medium">規格:</span> {herb.quantity_per_bottle}{herb.unit}/瓶</p>
-                          </>
-                        )}
-                      </div>
+
+                  <div className="col-span-2 pr-2 text-xs">
+                    <div className="flex flex-col">
+                      <span className="font-medium">{herb.brand}</span>
+                      <span className="text-gray-500">濃縮比: {herb.concentration_ratio}:1</span>
+                      <span className={`mt-1 px-1.5 py-0.5 rounded-full text-center ${inventoryStatusClass}`}>
+                        {inventoryStatusText}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="col-span-1 pr-2 text-right">
+                    {showPriceInfo && (
+                      <span>{herb.price_per_gram.toFixed(2)}</span>
                     )}
                   </div>
-                  <div className="col-span-2 pr-2">
-                    {inventoryCheck && (
-                      <div className={`text-xs ${isInventorySufficient ? 'text-green-600' : 'text-red-600'}`}>
-                        {isInventorySufficient 
-                          ? `庫存充足 (${inventoryCheck.available_amount}g)` 
-                          : `庫存不足 (${inventoryCheck.available_amount}g < ${inventoryCheck.required_amount}g)`
-                        }
-                      </div>
+
+                  <div className="col-span-1 pr-2 text-right font-medium">
+                    {showPriceInfo && (
+                      <span>{herb.total_price.toFixed(2)}</span>
                     )}
                   </div>
+
                   <div className="col-span-1 flex justify-center">
-                    {prescription.herbs.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveHerb(herb.id)}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        ×
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveHerb(herb.id)}
+                      className="text-red-500 hover:text-red-700 w-6 h-6 flex items-center justify-center rounded-full hover:bg-red-100"
+                    >
+                      ×
+                    </button>
                   </div>
                 </div>
               );
             })}
           </div>
-          
+
           {/* 新增按鈕 */}
-          <div className="p-2 bg-gray-50 flex justify-center">
+          <div className="p-3 bg-gray-50 flex justify-center">
             <button
               type="button"
               onClick={handleAddHerb}
-              className="px-4 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded-md"
+              className="px-4 py-1.5 text-sm bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-md shadow-sm flex items-center"
             >
-              + 新增藥材
+              <span className="mr-1 font-bold">+</span> 新增藥材
             </button>
           </div>
         </div>
-        
+
         {/* 服法說明 */}
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-600">服法</label>
@@ -426,34 +757,50 @@ const HerbalPrescriptionForm = forwardRef<
             rows={2}
           />
         </div>
-        
-        {/* 處方總價 */}
+
+        {/* 處方總價與操作按鈕 */}
         <div className="flex justify-between items-center">
           <div className="flex items-center">
-            <input 
-              type="checkbox" 
-              id="showPriceInfo" 
-              checked={showPriceInfo} 
+            <input
+              type="checkbox"
+              id="showPriceInfo"
+              checked={showPriceInfo}
               onChange={() => setShowPriceInfo(!showPriceInfo)}
               className="mr-2"
             />
             <label htmlFor="showPriceInfo" className="text-sm text-gray-700">顯示價格信息</label>
           </div>
-          
+
           {showPriceInfo && (
-            <div className="text-right">
-              <p className="text-sm font-medium">處方預估費用: <span className="text-blue-600">{totalPrice.toFixed(2)} HKD</span></p>
-              <p className="text-xs text-gray-500">(按瓶計算，部分使用則按整瓶計)</p>
+            <div className="text-right p-2 bg-blue-50 rounded-md">
+              <p className="text-xl font-bold text-blue-700">處方總價: <span>{prescription.total_price.toFixed(2)} HKD</span></p>
             </div>
           )}
         </div>
-        
+
+        <div className="flex justify-between items-center mt-2">
+          <button
+            type="button"
+            onClick={handleSaveTemplate}
+            className="text-sm text-blue-600 hover:underline"
+          >
+            儲存為處方模板
+          </button>
+          <button
+            type="button"
+            onClick={handleLoadTemplate}
+            className="text-sm text-blue-600 hover:underline"
+          >
+            載入處方模板
+          </button>
+        </div>
+
         <div className="flex justify-end">
           <button
             type="submit"
-            className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
+            className="bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600 shadow-sm"
           >
-            儲存
+            儲存處方
           </button>
         </div>
       </form>
