@@ -92,58 +92,42 @@ def build_path(code: str) -> List[str]:
 
 # 1. 生成 knowledge_base.jsonl
 print("生成 knowledge_base.jsonl...")
-knowledge_base = []
 
-for item in tcm_data:
-    code = item.get("code", "")
-    name = item.get("name", "")
-    aliases = item.get("aliases", [])
-    
-    # 獲取完整路徑
+def get_full_path(code, name):
     try:
-        full_path = build_path(code)
+        return build_path(code)
     except Exception as e:
         print(f"處理代碼 {code} 時出錯: {str(e)}")
-        full_path = [name]
-    
-    # 建立知識條目
-    entry = {
-        "code": code,
-        "name": name,
-        "aliases": aliases,
-        "full_path": full_path
+        return [name]
+
+knowledge_base = [
+    {
+        "code": item.get("code", ""),
+        "name": item.get("name", ""),
+        "aliases": item.get("aliases", []),
+        "full_path": get_full_path(item.get("code", ""), item.get("name", ""))
     }
-    knowledge_base.append(entry)
+    for item in tcm_data
+]
 
 # 2. 生成 query_preprocess_mapping.json
 print("生成 query_preprocess_mapping.json...")
-query_mapping = {}
 
-# 從現有的 alias_to_name 建立映射
-for alias, std_name in alias_to_name.items():
-    query_mapping[alias] = std_name
-
-# 添加標準名稱到自身的映射
-for item in tcm_data:
-    name = item.get("name", "")
-    if name:
-        # 確保標準名稱也可以被正確轉換
-        query_mapping[name] = name
-        
-        # 處理不帶"症"字的輸入
-        if name.endswith("症"):
-            name_without_suffix = name[:-1]
-            query_mapping[name_without_suffix] = name
+# 合併所有字典來源
+query_mapping = (
+    alias_to_name | 
+    {name: name for item in tcm_data if (name := item.get("name", ""))} |
+    {name[:-1]: name for name in 
+        {item.get("name", "") for item in tcm_data if item.get("name", "")} 
+        if name.endswith("症")}
+)
 
 # 3. 生成 validation_name_list.json
 print("生成 validation_name_list.json...")
-validation_names = []
-
-# 將所有標準名稱添加到驗證列表
-for item in tcm_data:
-    name = item.get("name", "")
-    if name and name not in validation_names:
-        validation_names.append(name)
+validation_names = list({
+    item.get("name", "") for item in tcm_data 
+    if item.get("name", "")
+})
 
 # 將三個檔案保存到硬碟
 save_jsonl_file(knowledge_base, 'knowledge_base.jsonl')

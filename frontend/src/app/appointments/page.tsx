@@ -16,6 +16,9 @@ import BatchReminderModal from "../components/BatchReminderModal";
 // 註冊繁體中文語言環境
 registerLocale("zh-TW", zhTW);
 
+// 添加自定義日曆樣式
+import "./datepicker-custom.css";
+
 // API路徑設置
 // 不再使用硬編碼的URL，改用getBackendUrl函數
 const API_BASE_URL = "/api/v1";
@@ -1278,12 +1281,7 @@ export default function AppointmentsPage() {
               placeholderText="選擇日期"
               className="p-2 border rounded-md"
               renderDayContents={renderDayContents}
-              // 添加特殊日期標記
-              filterDate={date => {
-                // 標記週末
-                const isWeekDay = date.getDay() !== 0 && date.getDay() !== 6;
-                return isWeekDay;
-              }}
+              calendarStartDay={0}
             />
           </div>
 

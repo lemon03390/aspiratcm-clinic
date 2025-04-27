@@ -23,6 +23,7 @@ interface AsyncTreeSelectProps {
   treeDefaultExpandAll?: boolean;
   disabled?: boolean;
   loading?: boolean;
+  treeData?: TreeNode[];
 }
 
 const AsyncTreeSelect: React.FC<AsyncTreeSelectProps> = ({
@@ -37,9 +38,10 @@ const AsyncTreeSelect: React.FC<AsyncTreeSelectProps> = ({
   allowClear = true,
   treeDefaultExpandAll = false,
   disabled = false,
-  loading = false
+  loading = false,
+  treeData: providedTreeData
 }) => {
-  const [treeData, setTreeData] = useState<TreeNode[]>([]);
+  const [treeData, setTreeData] = useState<TreeNode[]>(providedTreeData || []);
   const [searchValue, setSearchValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -85,6 +87,13 @@ const AsyncTreeSelect: React.FC<AsyncTreeSelectProps> = ({
       onSelect(value, node);
     }
   };
+
+  // 當提供的treeData變更時更新內部狀態
+  useEffect(() => {
+    if (providedTreeData) {
+      setTreeData(providedTreeData);
+    }
+  }, [providedTreeData]);
 
   // 清除搜尋防止記憶體洩漏
   useEffect(() => {

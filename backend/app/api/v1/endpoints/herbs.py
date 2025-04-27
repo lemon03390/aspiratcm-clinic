@@ -2,6 +2,8 @@ from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
+import json
+from pathlib import Path
 
 from app.db.session import get_db
 from app.models import Herb, Inventory
@@ -57,6 +59,23 @@ def search_herbs(
     herbs = query.order_by(Herb.code).offset(skip).limit(limit).all()
     
     return {"items": herbs, "total": total}
+
+
+@router.get("/powder-ratio-price", response_model=List[Dict[str, Any]])
+def get_powder_ratio_price():
+    """
+    獲取中藥粉末與飲片換算資料 (powder_ratio_price.json)
+    返回完整中藥數據列表
+    """
+    try:
+        # 讀取 JSON 檔案
+        data_file = Path(__file__).parent.parent.parent.parent.parent / "data" / "powder_ratio_price.json"
+        with open(data_file, "r", encoding="utf-8") as f:
+            herbs_data = json.load(f)
+        
+        return herbs_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"讀取中藥資料失敗: {str(e)}")
 
 
 @router.post("/inventory/check", response_model=InventoryCheckResponse)

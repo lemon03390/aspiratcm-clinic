@@ -1,13 +1,1 @@
-{
-  "/_not-found": "app/_not-found.js",
-  "/api-test/page": "app/api-test/page.js",
-  "/api/v1/appointments/[...path]/route": "app/api/v1/appointments/[...path]/route.js",
-  "/api/v1/appointments/route": "app/api/v1/appointments/route.js",
-  "/api/v1/doctors/[...path]/route": "app/api/v1/doctors/[...path]/route.js",
-  "/api/v1/doctors/route": "app/api/v1/doctors/route.js",
-  "/api/v1/test-api-config/route": "app/api/v1/test-api-config/route.js",
-  "/api/v1/test/route": "app/api/v1/test/route.js",
-  "/page": "app/page.js",
-  "/test-config/page": "app/test-config/page.js",
-  "/appointments/page": "app/appointments/page.js"
-}
+{}

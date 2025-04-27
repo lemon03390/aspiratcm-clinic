@@ -12,6 +12,7 @@ type PatientInWaiting = {
   chief_complaint?: string; // 主訴
   special_note?: string; // 特殊情況註記
   doctor_name?: string; // 主診醫師
+  waiting_since_timestamp?: string; // 登記時間戳，用於計算等候時間
 };
 
 type WaitingListProps = {
@@ -28,6 +29,36 @@ const WaitingList: React.FC<WaitingListProps> = ({
   onRefresh
 }) => {
   const isEmptyList = !patients || patients.length === 0;
+
+  // 計算等候時間（分鐘）
+  const calculateWaitingTime = (waitingSinceTimestamp: string | undefined): string => {
+    if (!waitingSinceTimestamp) return "未知";
+
+    try {
+      const registrationTime = new Date(waitingSinceTimestamp);
+      const currentTime = new Date();
+
+      if (isNaN(registrationTime.getTime())) {
+        return "時間格式錯誤";
+      }
+
+      const diffMs = currentTime.getTime() - registrationTime.getTime();
+      const diffMinutes = Math.floor(diffMs / 60000);
+
+      if (diffMinutes < 1) {
+        return "剛剛";
+      } else if (diffMinutes < 60) {
+        return `${diffMinutes} 分鐘`;
+      } else {
+        const hours = Math.floor(diffMinutes / 60);
+        const minutes = diffMinutes % 60;
+        return `${hours} 小時 ${minutes} 分鐘`;
+      }
+    } catch (error) {
+      console.error("計算等候時間出錯:", error);
+      return "計算錯誤";
+    }
+  };
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
@@ -80,7 +111,11 @@ const WaitingList: React.FC<WaitingListProps> = ({
                         </span>
                       )}
                     </div>
-                    <span className="text-gray-500 text-sm block">等候時間: {patient.waitingSince}</span>
+                    <span className="text-gray-500 text-sm block">
+                      等候時間: {patient.waiting_since_timestamp
+                        ? calculateWaitingTime(patient.waiting_since_timestamp)
+                        : patient.waitingSince}
+                    </span>
                     {patient.chief_complaint && (
                       <span className="text-xs text-gray-600 block mt-1 line-clamp-1">
                         主訴: {patient.chief_complaint}

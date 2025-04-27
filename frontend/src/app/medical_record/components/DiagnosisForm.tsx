@@ -162,6 +162,27 @@ const convertSearchToTreeNodes = (items: any[]): TreeNode[] => {
   }
 };
 
+// 添加自訂資料輸入函數
+const handleCustomInput = (field: string, input: string, updateFunc: (values: string[]) => void) => {
+  if (!input || input.trim() === '') return;
+
+  // 生成一個隨機ID作為代碼
+  const randomCode = `custom-${Math.random().toString(36).substring(2, 9)}`;
+  const item = {
+    code: randomCode,
+    name: input.trim()
+  };
+
+  // 模擬資料結構
+  const customNode = {
+    label: item.name,
+    value: item.code,
+    isLeaf: true
+  };
+
+  updateFunc([item.code]);
+};
+
 const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
   initialValues,
   onSave
@@ -203,9 +224,47 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
     searchReferenceData
   } = useReferenceData();
 
+  // 加載初始樹狀數據
+  const [modernDiseaseTreeData, setModernDiseaseTreeData] = useState<TreeNode[]>([]);
+  const [cmSyndromeTreeData, setCmSyndromeTreeData] = useState<TreeNode[]>([]);
+  const [cmPrincipleTreeData, setCmPrincipleTreeData] = useState<TreeNode[]>([]);
+  const [isLoadingTreeData, setIsLoadingTreeData] = useState(false);
+
+  // 在組件載入時預取樹狀數據
+  useEffect(() => {
+    const loadInitialTreeData = async () => {
+      setIsLoadingTreeData(true);
+      try {
+        // 並行獲取所有數據
+        const [modernDiseases, cmSyndromes, cmPrinciples] = await Promise.all([
+          diagnosisDataApi.getModernDiseaseTree(),
+          diagnosisDataApi.getCMSyndromeTree(),
+          diagnosisDataApi.getTreatmentPrincipleTree()
+        ]);
+
+        setModernDiseaseTreeData(modernDiseases);
+        setCmSyndromeTreeData(cmSyndromes);
+        setCmPrincipleTreeData(cmPrinciples);
+      } catch (error) {
+        console.error('預加載樹狀數據失敗:', error);
+      } finally {
+        setIsLoadingTreeData(false);
+      }
+    };
+
+    loadInitialTreeData();
+  }, []);
+
   // 載入現代病名樹狀數據
   const loadModernDiseaseTree = async (searchTerm: string): Promise<TreeNode[]> => {
     try {
+      // 如果輸入的搜尋詞為空或太短，直接使用樹狀結構數據
+      if (!searchTerm || searchTerm.length < 2) {
+        const treeData = await diagnosisDataApi.getModernDiseaseTree();
+        return treeData;
+      }
+
+      // 否則使用搜尋API
       const results = await diagnosisDataApi.searchModernDiseases(searchTerm);
       return convertSearchToTreeNodes(results);
     } catch (error) {
@@ -217,6 +276,13 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
   // 載入中醫證候樹狀數據
   const loadCmSyndromeTree = async (searchTerm: string): Promise<TreeNode[]> => {
     try {
+      // 如果輸入的搜尋詞為空或太短，直接使用樹狀結構數據
+      if (!searchTerm || searchTerm.length < 2) {
+        const treeData = await diagnosisDataApi.getCMSyndromeTree();
+        return treeData;
+      }
+
+      // 否則使用搜尋API
       const results = await diagnosisDataApi.searchCMSyndromes(searchTerm);
       return convertSearchToTreeNodes(results);
     } catch (error) {
@@ -228,6 +294,13 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
   // 載入中醫治則樹狀數據
   const loadCmPrincipleTree = async (searchTerm: string): Promise<TreeNode[]> => {
     try {
+      // 如果輸入的搜尋詞為空或太短，直接使用樹狀結構數據
+      if (!searchTerm || searchTerm.length < 2) {
+        const treeData = await diagnosisDataApi.getTreatmentPrincipleTree();
+        return treeData;
+      }
+
+      // 否則使用搜尋API
       const results = await diagnosisDataApi.searchTreatmentRules(searchTerm);
       return convertSearchToTreeNodes(results);
     } catch (error) {
@@ -407,12 +480,85 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
     }
   }, [safeInitialValues]);
 
+  // 添加用於輸入的狀態
+  const [customInputs, setCustomInputs] = useState({
+    modernDisease: '',
+    cmSyndrome: '',
+    cmPrinciple: ''
+  });
+
+  // 處理自訂輸入變更
+  const handleCustomInputChange = (field: string, value: string) => {
+    setCustomInputs(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // 處理自訂輸入提交
+  const handleCustomInputSubmit = (field: string) => {
+    const input = customInputs[field as keyof typeof customInputs];
+    if (!input || input.trim() === '') return;
+
+    if (field === 'modernDisease') {
+      const code = `custom-md-${Math.random().toString(36).substring(2, 9)}`;
+      const newItem = {
+        code,
+        name: input.trim()
+      };
+
+      setDiagnosisData(prev => ({
+        ...prev,
+        modernDiseases: [...prev.modernDiseases, newItem]
+      }));
+
+      setCustomInputs(prev => ({
+        ...prev,
+        modernDisease: ''
+      }));
+    }
+    else if (field === 'cmSyndrome') {
+      const code = `custom-cs-${Math.random().toString(36).substring(2, 9)}`;
+      const newItem = {
+        code,
+        name: input.trim()
+      };
+
+      setDiagnosisData(prev => ({
+        ...prev,
+        cmSyndromes: [...prev.cmSyndromes, newItem]
+      }));
+
+      setCustomInputs(prev => ({
+        ...prev,
+        cmSyndrome: ''
+      }));
+    }
+    else if (field === 'cmPrinciple') {
+      const code = `custom-cp-${Math.random().toString(36).substring(2, 9)}`;
+      const newItem = {
+        code,
+        name: input.trim()
+      };
+
+      setDiagnosisData(prev => ({
+        ...prev,
+        cmPrinciple: [...prev.cmPrinciple, newItem]
+      }));
+
+      setCustomInputs(prev => ({
+        ...prev,
+        cmPrinciple: ''
+      }));
+    }
+  };
+
   return (
     <DiagnosisErrorBoundary>
       <div className="bg-white p-4 rounded-md shadow">
         <h2 className="text-lg font-semibold mb-3 text-gray-800 border-b pb-2">中醫診斷</h2>
 
-        {isLoading ? (
+        {isLoading || isLoadingTreeData ? (
           <div className="py-4 flex justify-center">
             <div className="animate-pulse flex space-x-2">
               <div className="h-3 w-3 bg-blue-500 rounded-full"></div>
@@ -426,15 +572,40 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
             {/* 現代病名 - 多選 */}
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-600">現代病名（多選）</label>
-              <AsyncTreeSelect
-                placeholder="搜尋現代病名..."
-                loadData={loadModernDiseaseTree}
-                onChange={handleModernDiseaseChange}
-                value={selectedModernDiseases}
-                multiple={true}
-                allowClear={true}
-                treeDefaultExpandAll={false}
-              />
+
+              {/* 自訂輸入 */}
+              <div className="flex space-x-2 mb-2">
+                <input
+                  type="text"
+                  value={customInputs.modernDisease}
+                  onChange={(e) => handleCustomInputChange('modernDisease', e.target.value)}
+                  className="flex-1 p-2 border border-gray-300 rounded-md"
+                  placeholder="輸入自訂現代病名..."
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleCustomInputSubmit('modernDisease'))}
+                />
+                <button
+                  type="button"
+                  onClick={() => handleCustomInputSubmit('modernDisease')}
+                  className="px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                >
+                  新增
+                </button>
+              </div>
+
+              {/* 樹狀選擇器 */}
+              <div className="border border-gray-300 rounded-md p-2 bg-gray-50">
+                <label className="block text-xs text-gray-500 mb-2">從樹狀目錄選擇：</label>
+                <AsyncTreeSelect
+                  placeholder="搜尋現代病名..."
+                  loadData={loadModernDiseaseTree}
+                  onChange={handleModernDiseaseChange}
+                  value={selectedModernDiseases}
+                  multiple={true}
+                  allowClear={true}
+                  treeDefaultExpandAll={false}
+                  treeData={modernDiseaseTreeData.length > 0 ? modernDiseaseTreeData : undefined}
+                />
+              </div>
 
               {/* 已選擇項目顯示 */}
               <div className="flex flex-wrap gap-2 mt-2">
@@ -444,6 +615,15 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
                     className="flex items-center bg-blue-100 px-2 py-1 rounded"
                   >
                     <span>{item.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleModernDiseaseChange(selectedModernDiseases.filter(code => code !== item.code))}
+                      className="ml-1 text-blue-500 hover:text-blue-700"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
                   </div>
                 ))}
               </div>
@@ -452,15 +632,40 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
             {/* 中醫辨證 - 多選 */}
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-600">中醫辨證（多選）</label>
-              <AsyncTreeSelect
-                placeholder="搜尋中醫辨證..."
-                loadData={loadCmSyndromeTree}
-                onChange={handleCmSyndromeChange}
-                value={selectedCmSyndromes}
-                multiple={true}
-                allowClear={true}
-                treeDefaultExpandAll={false}
-              />
+
+              {/* 自訂輸入 */}
+              <div className="flex space-x-2 mb-2">
+                <input
+                  type="text"
+                  value={customInputs.cmSyndrome}
+                  onChange={(e) => handleCustomInputChange('cmSyndrome', e.target.value)}
+                  className="flex-1 p-2 border border-gray-300 rounded-md"
+                  placeholder="輸入自訂中醫辨證..."
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleCustomInputSubmit('cmSyndrome'))}
+                />
+                <button
+                  type="button"
+                  onClick={() => handleCustomInputSubmit('cmSyndrome')}
+                  className="px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                >
+                  新增
+                </button>
+              </div>
+
+              {/* 樹狀選擇器 */}
+              <div className="border border-gray-300 rounded-md p-2 bg-gray-50">
+                <label className="block text-xs text-gray-500 mb-2">從樹狀目錄選擇：</label>
+                <AsyncTreeSelect
+                  placeholder="搜尋中醫辨證..."
+                  loadData={loadCmSyndromeTree}
+                  onChange={handleCmSyndromeChange}
+                  value={selectedCmSyndromes}
+                  multiple={true}
+                  allowClear={true}
+                  treeDefaultExpandAll={false}
+                  treeData={cmSyndromeTreeData.length > 0 ? cmSyndromeTreeData : undefined}
+                />
+              </div>
 
               {/* 已選擇項目顯示 */}
               <div className="flex flex-wrap gap-2 mt-2">
@@ -470,6 +675,15 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
                     className="flex items-center bg-blue-100 px-2 py-1 rounded"
                   >
                     <span>{item.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleCmSyndromeChange(selectedCmSyndromes.filter(code => code !== item.code))}
+                      className="ml-1 text-blue-500 hover:text-blue-700"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
                   </div>
                 ))}
               </div>
@@ -478,15 +692,40 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
             {/* 中醫治則 - 多選 */}
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-600">中醫治則（多選）</label>
-              <AsyncTreeSelect
-                placeholder="搜尋中醫治則..."
-                loadData={loadCmPrincipleTree}
-                onChange={handleCmPrincipleChange}
-                value={selectedCmPrinciples}
-                multiple={true}
-                allowClear={true}
-                treeDefaultExpandAll={false}
-              />
+
+              {/* 自訂輸入 */}
+              <div className="flex space-x-2 mb-2">
+                <input
+                  type="text"
+                  value={customInputs.cmPrinciple}
+                  onChange={(e) => handleCustomInputChange('cmPrinciple', e.target.value)}
+                  className="flex-1 p-2 border border-gray-300 rounded-md"
+                  placeholder="輸入自訂中醫治則..."
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleCustomInputSubmit('cmPrinciple'))}
+                />
+                <button
+                  type="button"
+                  onClick={() => handleCustomInputSubmit('cmPrinciple')}
+                  className="px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                >
+                  新增
+                </button>
+              </div>
+
+              {/* 樹狀選擇器 */}
+              <div className="border border-gray-300 rounded-md p-2 bg-gray-50">
+                <label className="block text-xs text-gray-500 mb-2">從樹狀目錄選擇：</label>
+                <AsyncTreeSelect
+                  placeholder="搜尋中醫治則..."
+                  loadData={loadCmPrincipleTree}
+                  onChange={handleCmPrincipleChange}
+                  value={selectedCmPrinciples}
+                  multiple={true}
+                  allowClear={true}
+                  treeDefaultExpandAll={false}
+                  treeData={cmPrincipleTreeData.length > 0 ? cmPrincipleTreeData : undefined}
+                />
+              </div>
 
               {/* 已選擇項目顯示 */}
               <div className="flex flex-wrap gap-2 mt-2">
@@ -496,6 +735,15 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
                     className="flex items-center bg-blue-100 px-2 py-1 rounded"
                   >
                     <span>{item.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleCmPrincipleChange(selectedCmPrinciples.filter(code => code !== item.code))}
+                      className="ml-1 text-blue-500 hover:text-blue-700"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
                   </div>
                 ))}
               </div>

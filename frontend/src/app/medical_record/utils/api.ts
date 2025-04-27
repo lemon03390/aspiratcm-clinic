@@ -104,6 +104,52 @@ export const referenceDataApi = {
       return []; // 搜尋失敗時返回空數組
     }
   },
+
+  // 獲取舌診參考資料
+  getTongueReference: async () => {
+    try {
+      console.log('正在獲取舌診參考資料');
+      return await apiClientWithRetry('get', '/reference-data/tongue-reference');
+    } catch (error) {
+      console.error('獲取舌診參考資料失敗:', error);
+
+      // 如果API調用失敗，嘗試從本地數據獲取
+      try {
+        const response = await fetch('/data/tongue_reference.json');
+        if (response.ok) {
+          return await response.json();
+        }
+      } catch (localError) {
+        console.error('讀取本地舌診數據失敗:', localError);
+      }
+
+      // 都失敗時返回null
+      return null;
+    }
+  },
+
+  // 獲取脈診參考資料
+  getPulseReference: async () => {
+    try {
+      console.log('正在獲取脈診參考資料');
+      return await apiClientWithRetry('get', '/reference-data/pulse-reference');
+    } catch (error) {
+      console.error('獲取脈診參考資料失敗:', error);
+
+      // 如果API調用失敗，嘗試從本地數據獲取
+      try {
+        const response = await fetch('/data/pulse_reference.json');
+        if (response.ok) {
+          return await response.json();
+        }
+      } catch (localError) {
+        console.error('讀取本地脈診數據失敗:', localError);
+      }
+
+      // 都失敗時返回null
+      return null;
+    }
+  }
 };
 
 // 醫療記錄API
@@ -304,6 +350,18 @@ export const diagnosisDataApi = {
     }
   },
 
+  // 獲取現代病名樹狀數據
+  getModernDiseaseTree: async () => {
+    try {
+      console.log('正在獲取現代病名樹狀數據');
+      const response = await apiClientWithRetry('get', '/reference-data/modern-disease-tree');
+      return response || [];
+    } catch (error) {
+      console.error('獲取現代病名樹狀數據失敗:', error);
+      return [];
+    }
+  },
+
   // 獲取所有中醫證候
   getAllCMSyndromes: async () => {
     try {
@@ -313,6 +371,18 @@ export const diagnosisDataApi = {
     } catch (error) {
       console.error('獲取中醫證候資料失敗:', error);
       // 如果API調用失敗，返回空陣列避免UI崩潰
+      return [];
+    }
+  },
+
+  // 獲取中醫證候樹狀數據
+  getCMSyndromeTree: async () => {
+    try {
+      console.log('正在獲取中醫證候樹狀數據');
+      const response = await apiClientWithRetry('get', '/reference-data/cm-syndrome-tree');
+      return response || [];
+    } catch (error) {
+      console.error('獲取中醫證候樹狀數據失敗:', error);
       return [];
     }
   },
@@ -330,10 +400,61 @@ export const diagnosisDataApi = {
     }
   },
 
+  // 獲取中醫治則樹狀數據
+  getTreatmentPrincipleTree: async () => {
+    try {
+      console.log('正在獲取中醫治則樹狀數據');
+      const response = await apiClientWithRetry('get', '/reference-data/cm-treatment-rule-tree');
+      return response || [];
+    } catch (error) {
+      console.error('獲取中醫治則樹狀數據失敗:', error);
+      return [];
+    }
+  },
+
+  // 獲取中醫辨證自動完成數據
+  getCMSyndromeAutocomplete: async () => {
+    try {
+      console.log('正在獲取中醫辨證自動完成數據');
+      const response = await apiClientWithRetry('get', '/reference-data/cm-syndrome-autocomplete');
+      return response || [];
+    } catch (error) {
+      console.error('獲取中醫辨證自動完成數據失敗:', error);
+      return [];
+    }
+  },
+
+  // 獲取現代病名自動完成數據
+  getModernDiseaseAutocomplete: async () => {
+    try {
+      console.log('正在獲取現代病名自動完成數據');
+      const response = await apiClientWithRetry('get', '/reference-data/modern-disease-autocomplete');
+      return response || [];
+    } catch (error) {
+      console.error('獲取現代病名自動完成數據失敗:', error);
+      return [];
+    }
+  },
+
+  // 獲取中醫治則自動完成數據
+  getTreatmentPrincipleAutocomplete: async () => {
+    try {
+      console.log('正在獲取中醫治則自動完成數據');
+      const response = await apiClientWithRetry('get', '/reference-data/cm-treatment-rule-autocomplete');
+      return response || [];
+    } catch (error) {
+      console.error('獲取中醫治則自動完成數據失敗:', error);
+      return [];
+    }
+  },
+
   // 搜尋現代病名
   searchModernDiseases: async (query: string) => {
     try {
       console.log(`正在搜尋現代病名: ${query}`);
+      if (!query || query.trim().length < 2) {
+        return [];
+      }
       const response = await apiClientWithRetry('get', `/reference-data/search/modern-diseases?q=${encodeURIComponent(query)}`);
       return response?.data || [];
     } catch (error) {
@@ -346,6 +467,9 @@ export const diagnosisDataApi = {
   searchCMSyndromes: async (query: string) => {
     try {
       console.log(`正在搜尋中醫證候: ${query}`);
+      if (!query || query.trim().length < 2) {
+        return [];
+      }
       const response = await apiClientWithRetry('get', `/reference-data/search/cm-syndromes?q=${encodeURIComponent(query)}`);
       return response?.data || [];
     } catch (error) {
@@ -358,6 +482,9 @@ export const diagnosisDataApi = {
   searchTreatmentRules: async (query: string) => {
     try {
       console.log(`正在搜尋中醫治則: ${query}`);
+      if (!query || query.trim().length < 2) {
+        return [];
+      }
       const response = await apiClientWithRetry('get', `/reference-data/search/tcm-principles?q=${encodeURIComponent(query)}`);
       return response?.data || [];
     } catch (error) {
@@ -370,8 +497,19 @@ export const diagnosisDataApi = {
   searchMedicines: async (query: string) => {
     try {
       console.log(`正在搜尋中藥: ${query}`);
-      const response = await apiClientWithRetry('get', `/reference-data/search/medicine?q=${encodeURIComponent(query)}`);
-      return response?.data || [];
+
+      // 使用 API 進行搜尋
+      const endpoint = `/herbs?search=${encodeURIComponent(query)}&limit=50`;
+      console.log(`使用中藥搜尋端點: ${endpoint}`);
+
+      const response = await apiClientWithRetry('get', endpoint);
+      if (response?.items && Array.isArray(response.items)) {
+        console.log(`API返回中藥搜尋結果: ${response.items.length} 筆`);
+        return response.items || [];
+      } else {
+        console.warn('API返回的中藥搜尋結果格式不正確:', response);
+        return [];
+      }
     } catch (error) {
       console.error(`搜尋中藥失敗: ${query}`, error);
       return [];
@@ -383,14 +521,20 @@ export const diagnosisDataApi = {
     try {
       console.log('正在獲取中藥粉末與飲片換算資料');
       const response = await apiClientWithRetry('get', '/herbs/powder-ratio-price');
-      return response?.data || [];
+      console.log('成功從API獲取中藥資料，共', response.length, '筆');
+      return response || [];
     } catch (error) {
-      console.error('獲取中藥粉末與飲片換算資料失敗:', error);
+      console.error('從API獲取中藥粉末與飲片換算資料失敗:', error);
       // 如果 API 調用失敗，嘗試從本地數據獲取
       try {
+        console.log('嘗試從本地檔案獲取中藥資料');
         const response = await fetch('/data/powder_ratio_price.json');
         if (response.ok) {
-          return await response.json();
+          const data = await response.json();
+          console.log('成功從本地檔案獲取中藥資料，共', data.length, '筆');
+          return data;
+        } else {
+          console.error('本地檔案獲取失敗:', response.statusText);
         }
       } catch (localError) {
         console.error('讀取本地中藥數據失敗:', localError);

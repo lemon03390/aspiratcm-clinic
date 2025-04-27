@@ -33,11 +33,12 @@ export const HK_HOLIDAYS_2025: HolidayInfo[] = [
   { date: "2025-01-29", name: "農曆年初一" },
   { date: "2025-01-30", name: "農曆年初二" },
   { date: "2025-01-31", name: "農曆年初三" },
+  { date: "2025-04-05", name: "清明節" },
   { date: "2025-04-18", name: "耶穌受難節" },
   { date: "2025-04-19", name: "耶穌受難節翌日" },
   { date: "2025-04-21", name: "復活節星期一" },
   { date: "2025-05-01", name: "勞動節" },
-  { date: "2025-05-05", name: "佛誕" },
+  { date: "2025-05-12", name: "佛誕" },
   { date: "2025-06-25", name: "端午節" },
   { date: "2025-07-01", name: "香港特別行政區成立紀念日" },
   { date: "2025-09-01", name: "中秋節翌日" },
@@ -60,10 +61,10 @@ export const ALL_HK_HOLIDAYS: HolidayInfo[] = [
  */
 export function isHKHoliday(date: Date | string): HolidayInfo | null {
   // 將日期轉換為 YYYY-MM-DD 格式字串
-  const dateStr = typeof date === 'string' 
-    ? date 
+  const dateStr = typeof date === 'string'
+    ? date
     : date.toISOString().split('T')[0];
-  
+
   // 查找匹配的假期
   return ALL_HK_HOLIDAYS.find(holiday => holiday.date === dateStr) || null;
 }
