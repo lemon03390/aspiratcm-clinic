@@ -452,7 +452,7 @@ export const diagnosisDataApi = {
   searchModernDiseases: async (query: string) => {
     try {
       console.log(`正在搜尋現代病名: ${query}`);
-      if (!query || query.trim().length < 2) {
+      if (!query) {
         return [];
       }
       const response = await apiClientWithRetry('get', `/reference-data/search/modern-diseases?q=${encodeURIComponent(query)}`);
@@ -467,7 +467,7 @@ export const diagnosisDataApi = {
   searchCMSyndromes: async (query: string) => {
     try {
       console.log(`正在搜尋中醫證候: ${query}`);
-      if (!query || query.trim().length < 2) {
+      if (!query) {
         return [];
       }
       const response = await apiClientWithRetry('get', `/reference-data/search/cm-syndromes?q=${encodeURIComponent(query)}`);
@@ -482,7 +482,7 @@ export const diagnosisDataApi = {
   searchTreatmentRules: async (query: string) => {
     try {
       console.log(`正在搜尋中醫治則: ${query}`);
-      if (!query || query.trim().length < 2) {
+      if (!query) {
         return [];
       }
       const response = await apiClientWithRetry('get', `/reference-data/search/tcm-principles?q=${encodeURIComponent(query)}`);

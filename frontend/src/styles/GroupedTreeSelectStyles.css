@@ -1,0 +1,124 @@
+/* GroupedTreeSelectStyles.css */
+.react-select__control {
+    border-color: #e2e8f0;
+    box-shadow: none;
+    min-height: 38px;
+}
+
+.react-select__control:hover {
+    border-color: #cbd5e1;
+}
+
+.react-select__control--is-focused {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 1px #3b82f6 !important;
+}
+
+.react-select__indicator {
+    color: #94a3b8;
+}
+
+.react-select__indicator:hover {
+    color: #64748b;
+}
+
+.react-select__menu {
+    z-index: 9999;
+    border-radius: 4px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e2e8f0;
+}
+
+.react-select__menu-list {
+    padding: 8px;
+}
+
+.react-select__option {
+    padding: 8px 12px;
+    border-radius: 4px;
+}
+
+.react-select__option--is-focused {
+    background-color: #f0f9ff;
+}
+
+.react-select__option--is-selected {
+    background-color: #e6f4ff !important;
+    color: #000 !important;
+    font-weight: 500;
+}
+
+.react-select__multi-value {
+    background-color: #e6f4ff;
+    border-radius: 2px;
+}
+
+.react-select__multi-value__label {
+    color: #1e40af;
+    font-size: 0.85em;
+    padding: 3px 6px;
+}
+
+.react-select__multi-value__remove {
+    color: #3b82f6;
+    padding: 0 4px;
+}
+
+.react-select__multi-value__remove:hover {
+    background-color: #dbeafe;
+    color: #1d4ed8;
+}
+
+.react-select__group-heading {
+    color: #475569;
+    font-weight: 600;
+    font-size: 0.9em;
+    padding: 4px 12px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+
+.react-select__placeholder {
+    color: #94a3b8;
+}
+
+.react-select__input {
+    color: #1e293b;
+}
+
+.react-select__value-container {
+    padding: 2px 8px;
+}
+
+.react-select__clear-indicator {
+    padding: 6px;
+}
+
+.react-select__indicator-separator {
+    background-color: #e2e8f0;
+}
+
+/* 載入狀態指示器 */
+.react-select__loading-indicator {
+    color: #3b82f6;
+}
+
+/* 無選項訊息 */
+.react-select__menu-notice--no-options {
+    color: #64748b;
+    text-align: center;
+    padding: 8px 0;
+}
+
+/* 專門為樹狀結構設計的縮進 */
+.react-select__option-group-level-1 {
+    padding-left: 16px;
+}
+
+.react-select__option-group-level-2 {
+    padding-left: 32px;
+}
+
+.react-select__option-group-level-3 {
+    padding-left: 48px;
+}

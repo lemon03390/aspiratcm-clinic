@@ -3,6 +3,7 @@ import React from 'react';
 type PatientInWaiting = {
   id: string;
   name: string;
+  chinese_name?: string; // 添加中文名屬性
   isFirstVisit: boolean;
   waitingSince: string;
   registration_number: string;
@@ -32,7 +33,9 @@ const WaitingList: React.FC<WaitingListProps> = ({
 
   // 計算等候時間（分鐘）
   const calculateWaitingTime = (waitingSinceTimestamp: string | undefined): string => {
-    if (!waitingSinceTimestamp) return "未知";
+    if (!waitingSinceTimestamp) {
+      return "未知";
+    }
 
     try {
       const registrationTime = new Date(waitingSinceTimestamp);
@@ -104,7 +107,7 @@ const WaitingList: React.FC<WaitingListProps> = ({
                 <div className="flex justify-between items-start">
                   <div>
                     <div className="flex items-center">
-                      <span className="text-lg font-medium text-gray-800">{patient.name}</span>
+                      <span className="text-lg font-medium text-gray-800">{patient.chinese_name || patient.name}</span>
                       {patient.doctor_name && (
                         <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full">
                           {patient.doctor_name}

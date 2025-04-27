@@ -20,7 +20,9 @@ interface Herb {
   concentration_ratio: number;
   conversion_ratio?: number;
   decoction_equivalent_per_g: number;
-  price_per_gram: number;
+  price_per_gram?: number;
+  price?: number; // 可能從API返回的價格字段
+  quantity_per_bottle?: number; // 每瓶含量，用於計算單價
   unit: string;
   is_compound: boolean;
   registration_code?: string;
@@ -158,27 +160,64 @@ const HerbalPrescriptionForm = forwardRef<
           (herb.aliases?.some(alias => alias.toLowerCase().includes(searchTerm.toLowerCase())))
         );
 
-        return filteredHerbs.map(herb => ({
-          label: herb.name,
-          value: herb.code,
-          data: herb
-        }));
+        return filteredHerbs.map(herb => {
+          // 計算每克價格
+          const pricePerGram = calculatePricePerGram(herb);
+
+          return {
+            // 在標籤中明確顯示品牌名稱
+            label: `${herb.name} - ${herb.brand || '未知品牌'}`,
+            value: herb.code,
+            data: {
+              ...herb,
+              // 設置計算後的每克價格
+              price_per_gram: pricePerGram
+            }
+          };
+        });
       }
 
       // 如果本地數據未載入，則調用API
       const results = await diagnosisDataApi.searchMedicines(searchTerm);
 
-      return results.map(med => ({
-        label: med.name,
-        value: med.code,
-        data: med
-      }));
+      return results.map(med => {
+        // 計算每克價格
+        const pricePerGram = calculatePricePerGram(med);
+
+        return {
+          // 在標籤中明確顯示品牌名稱
+          label: `${med.name} - ${med.brand || '未知品牌'}`,
+          value: med.code,
+          data: {
+            ...med,
+            // 設置計算後的每克價格
+            price_per_gram: pricePerGram
+          }
+        };
+      });
     } catch (error) {
       console.error('搜尋中藥失敗:', error);
       return [];
     } finally {
       setSearchLoading(false);
     }
+  };
+
+  // 計算每克價格的輔助函數
+  const calculatePricePerGram = (herb: Herb): number => {
+    // 如果已有每克價格，直接返回
+    if (typeof herb.price_per_gram === 'number' && !isNaN(herb.price_per_gram) && herb.price_per_gram > 0) {
+      return herb.price_per_gram;
+    }
+
+    // 如果有總價和每瓶數量，則計算每克價格
+    if (typeof herb.price === 'number' && typeof herb.quantity_per_bottle === 'number'
+      && !isNaN(herb.price) && !isNaN(herb.quantity_per_bottle) && herb.quantity_per_bottle > 0) {
+      return herb.price / herb.quantity_per_bottle;
+    }
+
+    // 無法計算時返回0
+    return 0;
   };
 
   // 檢查庫存狀態
@@ -281,17 +320,20 @@ const HerbalPrescriptionForm = forwardRef<
       ...prev,
       herbs: prev.herbs.map(item => {
         if (item.id === id) {
+          // 計算每克價格
+          const pricePerGram = calculatePricePerGram(herbData);
+
           const newHerb: HerbItem = {
             ...item,
             code: herbData.code,
             name: herbData.name,
-            brand: herbData.brand,
+            brand: herbData.brand || '',
             is_compound: herbData.is_compound || false,
             ingredients: herbData.ingredients,
             registration_code: herbData.registration_code,
             concentration_ratio: herbData.concentration_ratio || 1,
             decoction_equivalent_per_g: herbData.decoction_equivalent_per_g || 1,
-            price_per_gram: herbData.price_per_gram || 0,
+            price_per_gram: pricePerGram,
             unit: herbData.unit || 'g',
             source: item.source || 'manual',
           };
@@ -307,7 +349,7 @@ const HerbalPrescriptionForm = forwardRef<
               );
               newHerb.powder_amount = powderAmount.toFixed(1);
               // 計算價格
-              newHerb.total_price = powderAmount * herbData.price_per_gram;
+              newHerb.total_price = powderAmount * pricePerGram;
             }
           }
 
@@ -322,7 +364,7 @@ const HerbalPrescriptionForm = forwardRef<
               );
               newHerb.decoction_amount = decoctionAmount.toFixed(1);
               // 計算價格
-              newHerb.total_price = powderAmount * herbData.price_per_gram;
+              newHerb.total_price = powderAmount * pricePerGram;
             }
           }
 
@@ -372,8 +414,8 @@ const HerbalPrescriptionForm = forwardRef<
             );
             decoctionAmount = decoctionValue.toFixed(1);
 
-            // 計算價格
-            totalPrice = numAmount * herb.price_per_gram;
+            // 計算價格 - 確保使用有效的價格
+            totalPrice = numAmount * (herb.price_per_gram || 0);
           }
 
           return {
@@ -407,8 +449,8 @@ const HerbalPrescriptionForm = forwardRef<
             );
             powderAmount = powderValue.toFixed(1);
 
-            // 計算價格
-            totalPrice = powderValue * herb.price_per_gram;
+            // 計算價格 - 確保使用有效的價格
+            totalPrice = powderValue * (herb.price_per_gram || 0);
           }
 
           return {
@@ -511,7 +553,7 @@ const HerbalPrescriptionForm = forwardRef<
     }
 
     return [{
-      label: herb.name,
+      label: `${herb.name} - ${herb.brand || '未知品牌'}`,
       value: herb.code,
       data: herb
     }];
@@ -625,36 +667,52 @@ const HerbalPrescriptionForm = forwardRef<
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* 藥材列表 */}
-        <div className="border rounded-md overflow-hidden">
+        <div className="border rounded-md overflow-hidden shadow-sm">
           {/* 表頭 */}
           <div className="grid grid-cols-12 bg-gray-100 p-2 border-b font-medium text-sm">
             <div className="col-span-3">中藥名稱</div>
             <div className="col-span-2">藥粉量 (g)</div>
             <div className="col-span-2">飲片量 (g)</div>
             <div className="col-span-2">品牌/規格</div>
-            <div className="col-span-1">單價 ($/g)</div>
-            <div className="col-span-1">小計 ($)</div>
-            <div className="col-span-1">操作</div>
+            <div className="col-span-1 text-right pr-2">單價 ($/g)</div>
+            <div className="col-span-1 text-right pr-2">小計 ($)</div>
+            <div className="col-span-1 text-center">操作</div>
           </div>
 
           {/* 藥材行 */}
           <div className="divide-y">
-            {prescription.herbs.map((herb) => {
+            {prescription.herbs.map((herb, index) => {
               const isAiSuggested = herb.source === 'AI_suggested';
               const inventoryStatusClass = getInventoryStatusStyle(herb.inventory_status);
               const inventoryStatusText = getInventoryStatusText(herb.inventory_status);
 
+              // 為不同品牌設置背景色以區分
+              let brandBackground = '';
+              if (herb.brand) {
+                if (herb.brand.toLowerCase().includes('漢方')) {
+                  brandBackground = 'bg-blue-50';
+                } else if (herb.brand.toLowerCase().includes('海天')) {
+                  brandBackground = 'bg-green-50';
+                } else if (herb.brand.toLowerCase().includes('香港中文大學')) {
+                  brandBackground = 'bg-yellow-50';
+                }
+              }
+
+              // 為空藥材行添加不同的提示文字
+              const isEmpty = !herb.name || !herb.code;
+              const placeholderText = isEmpty ? "搜尋並選擇藥材" : "搜尋中藥名稱";
+
               return (
                 <div
                   key={herb.id}
-                  className={`grid grid-cols-12 p-2 items-center text-sm ${isAiSuggested ? 'bg-green-50' : ''}`}
+                  className={`grid grid-cols-12 p-2 items-center text-sm ${isAiSuggested ? 'bg-green-50' : brandBackground}`}
                 >
                   <div className="col-span-3 pr-2 relative">
                     {isAiSuggested && (
                       <span className="absolute -left-1 -top-1 z-10 text-xs bg-green-500 text-white px-1 py-0.5 rounded-full">AI</span>
                     )}
                     <AsyncSelect
-                      placeholder="搜尋中藥名稱"
+                      placeholder={placeholderText}
                       loadOptions={searchMedicines}
                       onChange={(selectedItems) => handleHerbSelection(herb.id, selectedItems)}
                       value={getSelectedOption(herb)}
@@ -685,6 +743,7 @@ const HerbalPrescriptionForm = forwardRef<
                       onChange={(e) => handlePowderAmountChange(herb.id, e.target.value)}
                       placeholder="藥粉量"
                       className="w-full p-2 border border-gray-300 rounded-md"
+                      disabled={isEmpty}
                     />
                   </div>
 
@@ -695,29 +754,42 @@ const HerbalPrescriptionForm = forwardRef<
                       onChange={(e) => handleDecoctionAmountChange(herb.id, e.target.value)}
                       placeholder="飲片量"
                       className="w-full p-2 border border-gray-300 rounded-md"
+                      disabled={isEmpty}
                     />
                   </div>
 
                   <div className="col-span-2 pr-2 text-xs">
                     <div className="flex flex-col">
-                      <span className="font-medium">{herb.brand}</span>
-                      <span className="text-gray-500">濃縮比: {herb.concentration_ratio}:1</span>
-                      <span className={`mt-1 px-1.5 py-0.5 rounded-full text-center ${inventoryStatusClass}`}>
-                        {inventoryStatusText}
-                      </span>
+                      {herb.brand ? (
+                        <div className="flex items-center">
+                          <span className="font-medium">{herb.brand}</span>
+                          {herb.brand.toLowerCase().includes('漢方') &&
+                            <span className="ml-1 px-1 py-0.5 text-xs bg-blue-100 text-blue-800 rounded">漢方</span>
+                          }
+                          {herb.brand.toLowerCase().includes('海天') &&
+                            <span className="ml-1 px-1 py-0.5 text-xs bg-green-100 text-green-800 rounded">海天</span>
+                          }
+                        </div>
+                      ) : (
+                        <span className="font-medium text-gray-500">未知品牌</span>
+                      )}
+                      {!isEmpty && (
+                        <>
+                          <span className="text-gray-500">濃縮比: {herb.concentration_ratio}:1</span>
+                          <span className={`mt-1 px-1.5 py-0.5 rounded-full text-center ${inventoryStatusClass}`}>
+                            {inventoryStatusText}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
 
-                  <div className="col-span-1 pr-2 text-right">
-                    {showPriceInfo && (
-                      <span>{herb.price_per_gram.toFixed(2)}</span>
-                    )}
+                  <div className="col-span-1 pr-2 text-right font-medium">
+                    {(herb.price_per_gram || 0).toFixed(2)}
                   </div>
 
                   <div className="col-span-1 pr-2 text-right font-medium">
-                    {showPriceInfo && (
-                      <span>{herb.total_price.toFixed(2)}</span>
-                    )}
+                    {(herb.total_price || 0).toFixed(2)}
                   </div>
 
                   <div className="col-span-1 flex justify-center">
@@ -725,6 +797,7 @@ const HerbalPrescriptionForm = forwardRef<
                       type="button"
                       onClick={() => handleRemoveHerb(herb.id)}
                       className="text-red-500 hover:text-red-700 w-6 h-6 flex items-center justify-center rounded-full hover:bg-red-100"
+                      title="刪除此藥材"
                     >
                       ×
                     </button>

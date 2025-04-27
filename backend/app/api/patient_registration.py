@@ -324,6 +324,8 @@ def process_waiting_entries(db: Session, entries: List[WaitingList]) -> List[dic
     for entry in entries:
         try:
             if patient_data := get_patient_waiting_data(db, entry):
+                # 添加 name 屬性以相容前端
+                patient_data["name"] = patient_data["chinese_name"]
                 result.append(patient_data)
         except Exception as inner_err:
             logger.error(f"處理候診患者 {entry.patient_id} 資料時出錯: {str(inner_err)}")

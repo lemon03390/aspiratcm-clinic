@@ -1,8 +1,29 @@
 from sqlalchemy.orm import Session
 from app.models import WaitingList, Patient
 from app.utils.logger import get_logger
+from typing import List, Optional, Dict
 
 logger = get_logger(__name__)
+
+def get_patient_waiting_data(db: Session, entry: WaitingList) -> Optional[Dict]:
+    """從候診列表項目獲取患者詳細資訊"""
+    if not (patient := db.query(Patient).filter(Patient.id == entry.patient_id).first()):
+        return None
+    
+    return {
+        "id": entry.id,
+        "waiting_id": entry.id,
+        "patient_id": patient.id,
+        "registration_number": patient.registration_number,
+        "chinese_name": patient.chinese_name,
+        "is_troublesome": patient.is_troublesome,
+        "is_contagious": patient.is_contagious,
+        "special_note": patient.special_note,
+        "doctor_id": entry.doctor_id,
+        "waiting_since_timestamp": entry.created_at.isoformat() if entry.created_at else None,
+        "waitingSince": entry.created_at.strftime("%H:%M") if entry.created_at else None,
+        "isFirstVisit": getattr(patient, "isFirstVisit", False)
+    }
 
 def add_to_waiting_list(
     db: Session, 
@@ -26,8 +47,7 @@ def add_to_waiting_list(
     """
     try:
         # 檢查患者是否已在候診清單中
-        existing = db.query(WaitingList).filter(WaitingList.patient_id == patient_id).first()
-        if existing:
+        if existing := db.query(WaitingList).filter(WaitingList.patient_id == patient_id).first():
             # 如果已存在，返回現有記錄
             logger.info(f"患者 {patient_id} 已在候診清單中，跳過添加")
             return existing
@@ -78,3 +98,15 @@ def remove_from_waiting_list(db: Session, patient_id: int) -> bool:
         db.rollback()
         logger.error(f"從候診清單中移除患者時出錯: {str(e)}")
         raise 
+
+def process_waiting_entries(db: Session, entries: List[WaitingList]) -> List[dict]:
+    """處理候診清單條目，獲取患者詳細資訊"""
+    result = []
+    for entry in entries:
+        try:
+            if patient_data := get_patient_waiting_data(db, entry):
+                patient_data["name"] = patient_data["chinese_name"]
+                result.append(patient_data)
+        except Exception as inner_err:
+            logger.error(f"處理候診患者 {entry.patient_id} 資料時出錯: {str(inner_err)}")
+    return result 

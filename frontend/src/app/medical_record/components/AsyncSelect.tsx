@@ -45,7 +45,7 @@ const AsyncSelect: React.FC<AsyncSelectProps> = ({
         setOptions([]);
         return;
       }
-      
+
       setIsLoading(true);
       try {
         const results = await loadOptions(term);
@@ -84,7 +84,10 @@ const AsyncSelect: React.FC<AsyncSelectProps> = ({
       setSelectedItems([option]);
       onChange([option]);
     }
+
+    // 清空輸入框並關閉下拉選單
     setSearchTerm('');
+    setOptions([]);  // 清空選項避免重新出現
     setIsDropdownOpen(false);
   };
 
@@ -126,6 +129,54 @@ const AsyncSelect: React.FC<AsyncSelectProps> = ({
     };
   }, []);
 
+  // 提取品牌名稱和藥材名稱
+  const renderDropdownItem = (option: SelectOption) => {
+    // 判斷標籤是否已包含品牌信息
+    const hasBrandSeparator = option.label.includes(' - ');
+
+    if (hasBrandSeparator) {
+      const parts = option.label.split(' - ');
+      const name = parts[0].trim();
+      const brand = parts[1].trim();
+
+      return (
+        <div className="flex flex-col">
+          <span className="font-medium">{name}</span>
+          <span className="text-gray-500 text-xs mt-1">{brand}</span>
+        </div>
+      );
+    }
+
+    // 嘗試從data中獲取品牌信息
+    if (option.data && option.data.brand) {
+      const brandName = option.data.brand;
+      let brandStyle = {};
+      let brandBadge = null;
+
+      // 為不同品牌設置不同顏色標記
+      if (brandName.toLowerCase().includes('漢方')) {
+        brandStyle = { color: '#2563eb' };
+        brandBadge = <span className="ml-1 px-1 py-0.5 text-xs bg-blue-100 text-blue-800 rounded">漢方</span>;
+      } else if (brandName.toLowerCase().includes('海天')) {
+        brandStyle = { color: '#16a34a' };
+        brandBadge = <span className="ml-1 px-1 py-0.5 text-xs bg-green-100 text-green-800 rounded">海天</span>;
+      }
+
+      return (
+        <div className="flex flex-col">
+          <span className="font-medium">{option.label}</span>
+          <div className="flex items-center mt-1">
+            <span className="text-gray-500 text-xs" style={brandStyle}>{brandName}</span>
+            {brandBadge}
+          </div>
+        </div>
+      );
+    }
+
+    // 無品牌信息時只顯示標籤
+    return <span>{option.label}</span>;
+  };
+
   return (
     <div className={`async-select-container relative w-full ${className}`}>
       <div className="flex flex-wrap items-center w-full p-2 border border-gray-300 rounded-md focus-within:border-blue-500">
@@ -145,7 +196,7 @@ const AsyncSelect: React.FC<AsyncSelectProps> = ({
             </button>
           </div>
         ))}
-        
+
         {/* 搜尋輸入框 */}
         <input
           type="text"
@@ -155,14 +206,15 @@ const AsyncSelect: React.FC<AsyncSelectProps> = ({
           className="flex-grow min-w-[100px] outline-none"
           disabled={disabled}
           onFocus={() => setIsDropdownOpen(true)}
+          readOnly={!multiple && selectedItems.length > 0}
         />
-        
+
         {/* 載入指示器 */}
         {isLoading && (
           <div className="ml-2 h-4 w-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin"></div>
         )}
       </div>
-      
+
       {/* 下拉選單 */}
       {isDropdownOpen && options.length > 0 && (
         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
@@ -172,12 +224,12 @@ const AsyncSelect: React.FC<AsyncSelectProps> = ({
               className="px-4 py-2 cursor-pointer hover:bg-gray-100"
               onClick={() => handleSelectOption(option)}
             >
-              {option.label}
+              {renderDropdownItem(option)}
             </div>
           ))}
         </div>
       )}
-      
+
       {/* 無結果提示 */}
       {isDropdownOpen && searchTerm && !isLoading && options.length === 0 && (
         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg p-2 text-center text-gray-500">

@@ -164,7 +164,10 @@ const convertSearchToTreeNodes = (items: any[]): TreeNode[] => {
 
 // 添加自訂資料輸入函數
 const handleCustomInput = (field: string, input: string, updateFunc: (values: string[]) => void) => {
-  if (!input || input.trim() === '') return;
+  if (!input || input.trim() === '') {
+    console.log('自訂輸入為空，不進行處理');
+    return;
+  }
 
   // 生成一個隨機ID作為代碼
   const randomCode = `custom-${Math.random().toString(36).substring(2, 9)}`;
@@ -258,54 +261,228 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
   // 載入現代病名樹狀數據
   const loadModernDiseaseTree = async (searchTerm: string): Promise<TreeNode[]> => {
     try {
-      // 如果輸入的搜尋詞為空或太短，直接使用樹狀結構數據
+      console.log('載入現代病名樹狀數據，搜尋詞:', searchTerm);
+
+      // 如果輸入的搜尋詞為空，直接使用樹狀結構數據
       if (!searchTerm || searchTerm.length < 2) {
-        const treeData = await diagnosisDataApi.getModernDiseaseTree();
-        return treeData;
+        console.log('使用預先載入的現代病名樹狀數據');
+        return modernDiseaseTreeData;
       }
 
       // 否則使用搜尋API
+      console.log('使用API搜尋現代病名:', searchTerm);
       const results = await diagnosisDataApi.searchModernDiseases(searchTerm);
-      return convertSearchToTreeNodes(results);
+      console.log('API搜尋結果:', results.length, '筆');
+
+      if (results.length === 0 && modernDiseaseTreeData.length > 0) {
+        console.log('API搜尋無結果，使用預先載入的資料');
+        return modernDiseaseTreeData;
+      }
+
+      // 處理搜尋結果，構建臨時的樹狀結構
+      // 首先把結果按照點號分割的層級進行分組
+      const resultMap = new Map<string, any[]>();
+      const rootNodes: TreeNode[] = [];
+
+      // 第一步：分析所有節點並按前綴分組
+      results.forEach(item => {
+        if (!item.code) {
+          return;
+        }
+
+        const segments = item.code.split('.');
+
+        // 建立完整路徑的所有可能前綴
+        for (let i = 1; i <= segments.length; i++) {
+          const prefix = segments.slice(0, i).join('.');
+          if (!resultMap.has(prefix)) {
+            resultMap.set(prefix, []);
+          }
+        }
+
+        // 將項目添加到其直接前綴下
+        const parentPrefix = segments.slice(0, segments.length - 1).join('.');
+        resultMap.get(parentPrefix)?.push(item);
+      });
+
+      // 第二步：構建樹狀結構
+      const buildTree = (prefix: string): TreeNode[] => {
+        const children = resultMap.get(prefix) || [];
+        return children.map(item => {
+          const node: TreeNode = {
+            label: item.name,
+            value: item.code,
+            isLeaf: !resultMap.has(item.code) || resultMap.get(item.code)?.length === 0
+          };
+
+          if (!node.isLeaf) {
+            node.children = buildTree(item.code);
+          }
+
+          return node;
+        });
+      };
+
+      // 從根節點開始構建
+      const rootPrefix = '';
+      const tree = buildTree(rootPrefix);
+
+      return tree.length > 0 ? tree : modernDiseaseTreeData;
     } catch (error) {
       console.error('載入現代病名樹狀數據失敗:', error);
-      return [];
+      return modernDiseaseTreeData.length > 0 ? modernDiseaseTreeData : [];
     }
   };
 
   // 載入中醫證候樹狀數據
   const loadCmSyndromeTree = async (searchTerm: string): Promise<TreeNode[]> => {
     try {
-      // 如果輸入的搜尋詞為空或太短，直接使用樹狀結構數據
+      console.log('載入中醫證候樹狀數據，搜尋詞:', searchTerm);
+
+      // 如果輸入的搜尋詞為空，直接使用樹狀結構數據
       if (!searchTerm || searchTerm.length < 2) {
-        const treeData = await diagnosisDataApi.getCMSyndromeTree();
-        return treeData;
+        console.log('使用預先載入的中醫證候樹狀數據');
+        return cmSyndromeTreeData;
       }
 
       // 否則使用搜尋API
+      console.log('使用API搜尋中醫證候:', searchTerm);
       const results = await diagnosisDataApi.searchCMSyndromes(searchTerm);
-      return convertSearchToTreeNodes(results);
+      console.log('API搜尋結果:', results.length, '筆');
+
+      if (results.length === 0 && cmSyndromeTreeData.length > 0) {
+        console.log('API搜尋無結果，使用預先載入的資料');
+        return cmSyndromeTreeData;
+      }
+
+      // 處理搜尋結果，構建臨時的樹狀結構
+      // 首先把結果按照點號分割的層級進行分組
+      const resultMap = new Map<string, any[]>();
+      const rootNodes: TreeNode[] = [];
+
+      // 第一步：分析所有節點並按前綴分組
+      results.forEach(item => {
+        if (!item.code) {
+          return;
+        }
+
+        const segments = item.code.split('.');
+
+        // 建立完整路徑的所有可能前綴
+        for (let i = 1; i <= segments.length; i++) {
+          const prefix = segments.slice(0, i).join('.');
+          if (!resultMap.has(prefix)) {
+            resultMap.set(prefix, []);
+          }
+        }
+
+        // 將項目添加到其直接前綴下
+        const parentPrefix = segments.slice(0, segments.length - 1).join('.');
+        resultMap.get(parentPrefix)?.push(item);
+      });
+
+      // 第二步：構建樹狀結構
+      const buildTree = (prefix: string): TreeNode[] => {
+        const children = resultMap.get(prefix) || [];
+        return children.map(item => {
+          const node: TreeNode = {
+            label: item.name,
+            value: item.code,
+            isLeaf: !resultMap.has(item.code) || resultMap.get(item.code)?.length === 0
+          };
+
+          if (!node.isLeaf) {
+            node.children = buildTree(item.code);
+          }
+
+          return node;
+        });
+      };
+
+      // 從根節點開始構建
+      const rootPrefix = '';
+      const tree = buildTree(rootPrefix);
+
+      return tree.length > 0 ? tree : cmSyndromeTreeData;
     } catch (error) {
       console.error('載入中醫證候樹狀數據失敗:', error);
-      return [];
+      return cmSyndromeTreeData.length > 0 ? cmSyndromeTreeData : [];
     }
   };
 
   // 載入中醫治則樹狀數據
   const loadCmPrincipleTree = async (searchTerm: string): Promise<TreeNode[]> => {
     try {
-      // 如果輸入的搜尋詞為空或太短，直接使用樹狀結構數據
+      console.log('載入中醫治則樹狀數據，搜尋詞:', searchTerm);
+
+      // 如果輸入的搜尋詞為空，直接使用樹狀結構數據
       if (!searchTerm || searchTerm.length < 2) {
-        const treeData = await diagnosisDataApi.getTreatmentPrincipleTree();
-        return treeData;
+        console.log('使用預先載入的中醫治則樹狀數據');
+        return cmPrincipleTreeData;
       }
 
       // 否則使用搜尋API
+      console.log('使用API搜尋中醫治則:', searchTerm);
       const results = await diagnosisDataApi.searchTreatmentRules(searchTerm);
-      return convertSearchToTreeNodes(results);
+      console.log('API搜尋結果:', results.length, '筆');
+
+      if (results.length === 0 && cmPrincipleTreeData.length > 0) {
+        console.log('API搜尋無結果，使用預先載入的資料');
+        return cmPrincipleTreeData;
+      }
+
+      // 處理搜尋結果，構建臨時的樹狀結構
+      // 首先把結果按照點號分割的層級進行分組
+      const resultMap = new Map<string, any[]>();
+      const rootNodes: TreeNode[] = [];
+
+      // 第一步：分析所有節點並按前綴分組
+      results.forEach(item => {
+        if (!item.code) {
+          return;
+        }
+
+        const segments = item.code.split('.');
+
+        // 建立完整路徑的所有可能前綴
+        for (let i = 1; i <= segments.length; i++) {
+          const prefix = segments.slice(0, i).join('.');
+          if (!resultMap.has(prefix)) {
+            resultMap.set(prefix, []);
+          }
+        }
+
+        // 將項目添加到其直接前綴下
+        const parentPrefix = segments.slice(0, segments.length - 1).join('.');
+        resultMap.get(parentPrefix)?.push(item);
+      });
+
+      // 第二步：構建樹狀結構
+      const buildTree = (prefix: string): TreeNode[] => {
+        const children = resultMap.get(prefix) || [];
+        return children.map(item => {
+          const node: TreeNode = {
+            label: item.name,
+            value: item.code,
+            isLeaf: !resultMap.has(item.code) || resultMap.get(item.code)?.length === 0
+          };
+
+          if (!node.isLeaf) {
+            node.children = buildTree(item.code);
+          }
+
+          return node;
+        });
+      };
+
+      // 從根節點開始構建
+      const rootPrefix = '';
+      const tree = buildTree(rootPrefix);
+
+      return tree.length > 0 ? tree : cmPrincipleTreeData;
     } catch (error) {
       console.error('載入中醫治則樹狀數據失敗:', error);
-      return [];
+      return cmPrincipleTreeData.length > 0 ? cmPrincipleTreeData : [];
     }
   };
 
@@ -498,7 +675,10 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
   // 處理自訂輸入提交
   const handleCustomInputSubmit = (field: string) => {
     const input = customInputs[field as keyof typeof customInputs];
-    if (!input || input.trim() === '') return;
+    if (!input || input.trim() === '') {
+      console.log('自訂輸入為空，不進行處理');
+      return;
+    }
 
     if (field === 'modernDisease') {
       const code = `custom-md-${Math.random().toString(36).substring(2, 9)}`;
@@ -604,6 +784,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
                   allowClear={true}
                   treeDefaultExpandAll={false}
                   treeData={modernDiseaseTreeData.length > 0 ? modernDiseaseTreeData : undefined}
+                  minSearchCharacters={2}
                 />
               </div>
 
@@ -664,6 +845,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
                   allowClear={true}
                   treeDefaultExpandAll={false}
                   treeData={cmSyndromeTreeData.length > 0 ? cmSyndromeTreeData : undefined}
+                  minSearchCharacters={2}
                 />
               </div>
 
@@ -724,6 +906,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
                   allowClear={true}
                   treeDefaultExpandAll={false}
                   treeData={cmPrincipleTreeData.length > 0 ? cmPrincipleTreeData : undefined}
+                  minSearchCharacters={2}
                 />
               </div>
 
