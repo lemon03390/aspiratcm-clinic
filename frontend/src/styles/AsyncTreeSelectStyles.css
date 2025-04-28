@@ -1,101 +1,14 @@
 /* AsyncTreeSelectStyles.css */
 .rc-tree-select {
     width: 100%;
-    font-size: 14px;
-    position: relative;
-    z-index: 100;
 }
 
 .rc-tree-select-tree {
     margin-top: 4px;
-    max-height: 400px;
+    max-height: 300px;
     overflow: auto;
-    padding: 8px;
 }
 
 .rc-tree-select-dropdown {
     z-index: 9999;
-    border-radius: 4px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    border: 1px solid #e2e8f0;
-    min-width: 250px;
-    /* 確保選單寬度 */
-    width: auto !important;
-    /* 覆蓋內聯樣式 */
-}
-
-/* 樹節點樣式 */
-.rc-tree-select-tree-node {
-    padding: 5px 0;
-    border-radius: 4px;
-}
-
-.rc-tree-select-tree-node:hover {
-    background-color: #f0f9ff;
-}
-
-.rc-tree-select-tree-node-selected {
-    background-color: #e6f4ff !important;
-    font-weight: 500;
-}
-
-/* 選擇框樣式 */
-.rc-tree-select-selection {
-    min-height: 38px;
-    padding: 4px 8px;
-}
-
-/* 清除按鈕 */
-.rc-tree-select-clear {
-    background-color: rgba(0, 0, 0, 0.05);
-    border-radius: 50%;
-}
-
-/* 複選框樣式 */
-.rc-tree-select-tree-checkbox {
-    margin-right: 6px;
-}
-
-.rc-tree-select-tree-checkbox-checked .rc-tree-select-tree-checkbox-inner {
-    background-color: #3b82f6;
-    border-color: #3b82f6;
-}
-
-/* 滾動條樣式 */
-.rc-tree-select-tree::-webkit-scrollbar {
-    width: 6px;
-}
-
-.rc-tree-select-tree::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 4px;
-}
-
-.rc-tree-select-tree::-webkit-scrollbar-thumb {
-    background: #ddd;
-    border-radius: 4px;
-}
-
-.rc-tree-select-tree::-webkit-scrollbar-thumb:hover {
-    background: #ccc;
-}
-
-/* AsyncSelect 樣式 */
-.async-select-container {
-    position: relative;
-    z-index: 101;
-}
-
-.async-select-container .rc-tree-select-dropdown {
-    min-width: 100%;
-    left: 0 !important;
-}
-
-.async-select-container input {
-    padding: 8px 4px;
-}
-
-.async-select-container input:read-only {
-    cursor: default;
-    background-color: rgba(249, 250, 251, 0.5);
 }

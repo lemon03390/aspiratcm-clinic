@@ -228,9 +228,12 @@ const GroupedTreeSelect: React.FC<GroupedTreeSelectProps> = ({
                 className="w-full"
                 classNamePrefix="react-select"
                 noOptionsMessage={() => {
-                    if (isLoading) return "搜尋中...";
-                    if (searchValue && searchValue.length < minSearchCharacters)
+                    if (isLoading) {
+                        return "搜尋中...";
+                    }
+                    if (searchValue && searchValue.length < minSearchCharacters) {
                         return `請輸入至少 ${minSearchCharacters} 個字符`;
+                    }
                     return "無符合結果";
                 }}
                 components={{
