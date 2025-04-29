@@ -5,6 +5,7 @@ export interface ModernDisease {
     category_code?: string;
     category_name?: string;
     notes?: string;
+    parent: string | null;
 }
 
 export interface Syndrome {
@@ -14,6 +15,7 @@ export interface Syndrome {
     category_code?: string;
     category_name?: string;
     notes?: string;
+    parent: string | null;
 }
 
 export interface Principle {
@@ -23,6 +25,7 @@ export interface Principle {
     category_code?: string;
     category_name?: string;
     notes?: string;
+    parent: string | null;
 }
 
 export interface SelectOption {
@@ -31,6 +34,9 @@ export interface SelectOption {
     notes?: string; // 選項備註
     originalName?: string; // 原始正規名稱
     isAlias?: boolean; // 是否為別名
+    category?: string; // 類別名稱
+    categoryCode?: string; // 類別代碼
+    parent?: string | null; // 父項目代碼
 }
 
 export interface GroupedOption {

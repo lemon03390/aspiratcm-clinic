@@ -4,8 +4,7 @@ import { options as cmSyndromeOptions } from './cmSyndromeOptions';
 import { options as modernDiseaseOptions } from './modernDiseaseOptions';
 
 export {
-    cmPrincipleOptions,
-    cmSyndromeOptions,
-    modernDiseaseOptions
+  cmPrincipleOptions,
+  cmSyndromeOptions,
+  modernDiseaseOptions
 };
-

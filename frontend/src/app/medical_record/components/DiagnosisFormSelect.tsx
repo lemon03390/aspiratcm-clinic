@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
-import Select, { StylesConfig } from 'react-select';
+import Select, { StylesConfig, components } from 'react-select';
 import AsyncSelect from 'react-select/async';
 import CreatableSelect from 'react-select/creatable';
 
 export interface SelectOption {
     label: string;
     value: string;
+    notes?: string;
+    originalName?: string;
+    isAlias?: boolean;
+    category?: string;
+    categoryCode?: string;
+    parent?: string | null;
 }
 
 export interface GroupedOption {
@@ -40,9 +46,45 @@ const customFilterOption = (option: any, rawInput: string) => {
     }
 
     const optionLabel = option.label.toLowerCase();
+    const optionNotes = option.data?.notes?.toLowerCase() || '';
+    const optionOriginalName = option.data?.originalName?.toLowerCase() || '';
 
-    // 支援中文字符和拼音部分匹配
-    return optionLabel.includes(input);
+    // 支援標籤、別名、備註和原始名稱的模糊匹配
+    return optionLabel.includes(input) ||
+        optionNotes.includes(input) ||
+        optionOriginalName.includes(input);
+};
+
+// 自定義選項渲染組件，用於顯示備註
+const CustomOption = (props: any) => {
+    const { data } = props;
+    return (
+        <components.Option {...props}>
+            <div className="flex flex-col">
+                <div>{data.label}</div>
+                {data.notes && (
+                    <div className="text-xs text-gray-500 mt-0.5">{data.notes}</div>
+                )}
+            </div>
+        </components.Option>
+    );
+};
+
+// 自定義多選值組件，可以顯示備註
+const CustomMultiValue = (props: any) => {
+    const { data } = props;
+    return (
+        <components.MultiValue {...props}>
+            <div className="flex items-center">
+                <span>{data.label}</span>
+                {data.notes && (
+                    <span className="ml-1 text-xs text-gray-500">
+                        （{data.notes}）
+                    </span>
+                )}
+            </div>
+        </components.MultiValue>
+    );
 };
 
 const DiagnosisFormSelect: React.FC<DiagnosisFormSelectProps> = ({
@@ -85,7 +127,8 @@ const DiagnosisFormSelect: React.FC<DiagnosisFormSelectProps> = ({
     const handleCreate = (inputValue: string) => {
         const newOption: SelectOption = {
             label: inputValue,
-            value: `custom-${Math.random().toString(36).substring(2, 9)}`
+            value: `custom-${Math.random().toString(36).substring(2, 9)}`,
+            originalName: inputValue
         };
 
         onChange([...value, newOption]);
@@ -196,6 +239,10 @@ const DiagnosisFormSelect: React.FC<DiagnosisFormSelectProps> = ({
             onInputChange: handleInputChange,
             styles: customStyles,
             filterOption: customFilterOption,
+            components: {
+                Option: CustomOption,
+                MultiValue: CustomMultiValue
+            },
             // 增加搜尋匹配效能
             ignoreAccents: true,
             ignoreCase: true

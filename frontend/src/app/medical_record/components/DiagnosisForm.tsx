@@ -1,19 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import {
-  GroupedOption
+  GroupedOption,
+  SelectOption
 } from '../types/diagnosisReferenceTypes';
-// 使用本地引入替代API
+import { loadAllDiagnosisData } from '../utils/diagnosisDataLoader';
 import {
-  cmPrincipleOptions,
-  cmSyndromeOptions,
-  modernDiseaseOptions
-} from '../data/referenceOptions';
-import {
-  buildAliasMapping,
-  filterOptionsWithAlias
-} from '../utils/diagnosisReferenceUtils';
-import DiagnosisFormSelect, { MixedSelectOptions, SelectOption } from './DiagnosisFormSelect';
+  searchReferenceOptions
+} from '../utils/diagnosisTreeUtils';
+import DiagnosisFormSelect from './DiagnosisFormSelect';
 
 // 定義資料結構
 interface DiagnosisItem {
@@ -105,7 +100,7 @@ const convertDiagnosisItemsToOptions = (items: DiagnosisItem[]): SelectOption[] 
 const convertOptionsToDiagnosisItems = (options: SelectOption[]): DiagnosisItem[] => {
   return options.map(option => ({
     code: option.value,
-    name: option.label
+    name: option.originalName || option.label.split(' (又名:')[0].trim()
   }));
 };
 
@@ -117,18 +112,24 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
   const safeInitialValues = useMemo(() => normalizeDiagnosisData(initialValues), [initialValues]);
   const [diagnosisData, setDiagnosisData] = useState<DiagnosisData>(safeInitialValues);
 
-  // 設置加載狀態，但因為使用本地資料，實際不需要長時間的加載
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  // 設置加載狀態
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // 選項與別名映射
-  const [localModernDiseaseOptions, setLocalModernDiseaseOptions] = useState<GroupedOption[]>(modernDiseaseOptions);
-  const [localCmSyndromeOptions, setLocalCmSyndromeOptions] = useState<GroupedOption[]>(cmSyndromeOptions);
-  const [localCmPrincipleOptions, setLocalCmPrincipleOptions] = useState<GroupedOption[]>(cmPrincipleOptions);
+  // 處理後的參考數據
+  const [processedModernDiseases, setProcessedModernDiseases] = useState<{
+    groupedOptions: GroupedOption[];
+    searchableList: SelectOption[];
+  }>({ groupedOptions: [], searchableList: [] });
 
-  // 別名映射
-  const [modernDiseaseAliasMap, setModernDiseaseAliasMap] = useState<Record<string, string>>({});
-  const [cmSyndromeAliasMap, setCmSyndromeAliasMap] = useState<Record<string, string>>({});
-  const [cmPrincipleAliasMap, setCmPrincipleAliasMap] = useState<Record<string, string>>({});
+  const [processedCmSyndromes, setProcessedCmSyndromes] = useState<{
+    groupedOptions: GroupedOption[];
+    searchableList: SelectOption[];
+  }>({ groupedOptions: [], searchableList: [] });
+
+  const [processedCmPrinciples, setProcessedCmPrinciples] = useState<{
+    groupedOptions: GroupedOption[];
+    searchableList: SelectOption[];
+  }>({ groupedOptions: [], searchableList: [] });
 
   // 已選擇的選項
   const selectedModernDiseaseOptions = useMemo(() => {
@@ -143,54 +144,32 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
     return convertDiagnosisItemsToOptions(diagnosisData.cmPrinciple);
   }, [diagnosisData.cmPrinciple]);
 
-  // 初始化資料，從本地資料建立別名映射
+  // 初始化資料，從公共文件夾加載原始參考數據
   useEffect(() => {
-    // 從選項數據中構建別名映射
-    const extractOptionsForMapping = (groupedOptions: GroupedOption[]): Array<any> => {
-      const result: Array<any> = [];
-      groupedOptions.forEach(group => {
-        group.options.forEach(option => {
-          // 檢查是否為別名選項
-          if (option.isAlias && option.originalName) {
-            // 從標籤中提取別名（假設格式為 "別名 (又名: 原名)"）
-            const aliasMatch = option.label.match(/^(.*?)\s*\(又名:/);
-            if (aliasMatch && aliasMatch[1]) {
-              result.push({
-                name: option.originalName,
-                code: option.value,
-                aliases: [aliasMatch[1].trim()]
-              });
-            }
-          } else {
-            result.push({
-              name: option.label,
-              code: option.value,
-              aliases: []
-            });
-          }
+    const loadData = async () => {
+      setIsLoading(true);
+
+      try {
+        // 使用數據加載器加載並處理所有診斷參考數據
+        const allData = await loadAllDiagnosisData();
+
+        setProcessedModernDiseases(allData.modernDiseases);
+        setProcessedCmSyndromes(allData.cmSyndromes);
+        setProcessedCmPrinciples(allData.cmPrinciples);
+
+        console.log('診斷參考資料已載入並處理完成，共計：', {
+          '現代病名': allData.modernDiseases.searchableList.length,
+          '中醫辨證': allData.cmSyndromes.searchableList.length,
+          '中醫治則': allData.cmPrinciples.searchableList.length
         });
-      });
-      return result;
+      } catch (error) {
+        console.error('處理診斷參考資料時發生錯誤:', error);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    // 為三種類型的診斷數據建立別名映射
-    const modernDiseaseData = extractOptionsForMapping(modernDiseaseOptions);
-    const modernAliasMap = buildAliasMapping(modernDiseaseData);
-    setModernDiseaseAliasMap(modernAliasMap);
-
-    const cmSyndromeData = extractOptionsForMapping(cmSyndromeOptions);
-    const syndromeAliasMap = buildAliasMapping(cmSyndromeData);
-    setCmSyndromeAliasMap(syndromeAliasMap);
-
-    const cmPrincipleData = extractOptionsForMapping(cmPrincipleOptions);
-    const principleAliasMap = buildAliasMapping(cmPrincipleData);
-    setCmPrincipleAliasMap(principleAliasMap);
-
-    console.log('診斷參考資料已載入，共計：', {
-      '現代病名': modernDiseaseOptions.length,
-      '中醫辨證': cmSyndromeOptions.length,
-      '中醫治則': cmPrincipleOptions.length
-    });
+    loadData();
   }, []);
 
   // 當初始值變更時，更新診斷數據
@@ -199,25 +178,40 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
   }, [safeInitialValues]);
 
   // 各類診斷項目的本地搜尋過濾函數
-  const loadModernDiseaseOptions = async (inputValue: string): Promise<MixedSelectOptions> => {
+  const loadModernDiseaseOptions = async (inputValue: string) => {
     if (!inputValue || inputValue.length < 2) {
-      return localModernDiseaseOptions;
+      return processedModernDiseases.groupedOptions;
     }
-    return filterOptionsWithAlias(inputValue, localModernDiseaseOptions);
+
+    return searchReferenceOptions(
+      inputValue,
+      processedModernDiseases.searchableList,
+      processedModernDiseases.groupedOptions
+    );
   };
 
-  const loadCmSyndromeOptions = async (inputValue: string): Promise<MixedSelectOptions> => {
+  const loadCmSyndromeOptions = async (inputValue: string) => {
     if (!inputValue || inputValue.length < 2) {
-      return localCmSyndromeOptions;
+      return processedCmSyndromes.groupedOptions;
     }
-    return filterOptionsWithAlias(inputValue, localCmSyndromeOptions);
+
+    return searchReferenceOptions(
+      inputValue,
+      processedCmSyndromes.searchableList,
+      processedCmSyndromes.groupedOptions
+    );
   };
 
-  const loadCmPrincipleOptions = async (inputValue: string): Promise<MixedSelectOptions> => {
+  const loadCmPrincipleOptions = async (inputValue: string) => {
     if (!inputValue || inputValue.length < 2) {
-      return localCmPrincipleOptions;
+      return processedCmPrinciples.groupedOptions;
     }
-    return filterOptionsWithAlias(inputValue, localCmPrincipleOptions);
+
+    return searchReferenceOptions(
+      inputValue,
+      processedCmPrinciples.searchableList,
+      processedCmPrinciples.groupedOptions
+    );
   };
 
   // 處理各類診斷項目的選擇變更
@@ -270,7 +264,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
               <div className="border border-gray-300 rounded-md p-2 bg-gray-50">
                 <DiagnosisFormSelect
                   placeholder="搜尋或選擇現代病名..."
-                  options={localModernDiseaseOptions}
+                  options={processedModernDiseases.groupedOptions}
                   loadOptions={loadModernDiseaseOptions}
                   value={selectedModernDiseaseOptions}
                   onChange={handleModernDiseaseChange}
@@ -289,7 +283,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
               <div className="border border-gray-300 rounded-md p-2 bg-gray-50">
                 <DiagnosisFormSelect
                   placeholder="搜尋或選擇中醫辨證..."
-                  options={localCmSyndromeOptions}
+                  options={processedCmSyndromes.groupedOptions}
                   loadOptions={loadCmSyndromeOptions}
                   value={selectedCmSyndromeOptions}
                   onChange={handleCmSyndromeChange}
@@ -308,7 +302,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({
               <div className="border border-gray-300 rounded-md p-2 bg-gray-50">
                 <DiagnosisFormSelect
                   placeholder="搜尋或選擇中醫治則..."
-                  options={localCmPrincipleOptions}
+                  options={processedCmPrinciples.groupedOptions}
                   loadOptions={loadCmPrincipleOptions}
                   value={selectedCmPrincipleOptions}
                   onChange={handleCmPrincipleChange}

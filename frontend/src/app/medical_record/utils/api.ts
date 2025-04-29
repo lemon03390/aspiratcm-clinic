@@ -1,5 +1,9 @@
 import axios, { AxiosError } from 'axios';
 import { getBackendUrl } from '../../../libs/apiClient';
+import { cleanMedicalRecordData, cleanStringField } from './formHelpers';
+
+// 全局儲存中藥資料
+let allHerbs: any[] = [];
 
 // 從環境變數獲取API基礎URL
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1';
@@ -179,8 +183,63 @@ export const medicalRecordApi = {
   // 創建新醫療記錄
   createRecord: async (recordData: any) => {
     try {
-      console.log('正在創建病歷:', recordData);
-      return await apiClientWithRetry('post', '/medical-records', recordData);
+      console.log('收到病歷資料，準備清洗資料並轉換格式:', recordData);
+
+      // 先清理所有字串欄位，將空物件、null 等轉換為空字串
+      const cleanedData = cleanMedicalRecordData(recordData);
+      console.log('清理後的資料:', cleanedData);
+
+      // 轉換診斷資料為後端所需的格式
+      let transformedData = { ...cleanedData };
+
+      // 如果有診斷結構資料，轉換為後端要求格式
+      if (cleanedData.diagnosis_structured) {
+        const diagnosisData = cleanedData.diagnosis_structured;
+
+        transformedData.diagnosis = {
+          modern_diseases: (diagnosisData.modernDiseases || []).map(d => d.code || d.name || ''),
+          cm_syndromes: (diagnosisData.cmSyndromes || []).map(d => d.code || d.name || ''),
+          cm_principle: diagnosisData.cmPrinciple?.[0]?.code || diagnosisData.cmPrinciple?.[0]?.name || undefined
+        };
+
+        // 移除原始結構化診斷數據
+        delete transformedData.diagnosis_structured;
+      }
+
+      // 轉換處方藥材為後端所需格式
+      if (cleanedData.prescription && Array.isArray(cleanedData.prescription)) {
+        transformedData.prescription = {
+          instructions: cleanStringField(cleanedData.prescription_instructions || ""),
+          herbs: cleanedData.prescription.map((herb, index) => ({
+            herb_name: herb.name || '',
+            amount: herb.amount || herb.powder_amount || '0',
+            unit: herb.unit || "g",
+            sequence: index,
+            source: "manual",
+            structured_data: {
+              price_per_gram: herb.price_per_gram || 0,
+              total_price: herb.total_price || 0,
+              brand: herb.brand || '',
+              is_compound: herb.is_compound || false,
+              code: herb.code || ''
+            }
+          }))
+        };
+      }
+
+      // 確保將藥物從陣列轉換為物件
+      if (transformedData.prescription && !transformedData.prescription.herbs) {
+        transformedData.prescription = {
+          instructions: "",
+          herbs: transformedData.prescription
+        };
+      }
+
+      // 移除不需要的欄位
+      delete transformedData.prescription_instructions;
+
+      console.log('轉換後準備發送的病歷資料:', transformedData);
+      return await apiClientWithRetry('post', '/medical-records', transformedData);
     } catch (error) {
       console.error('創建病歷失敗:', error);
       throw error;
@@ -498,7 +557,37 @@ export const diagnosisDataApi = {
     try {
       console.log(`正在搜尋中藥: ${query}`);
 
-      // 使用 API 進行搜尋
+      // 先從本地已載入的數據搜尋
+      if (allHerbs && allHerbs.length > 0) {
+        const filteredHerbs = allHerbs.filter(herb =>
+          herb.name.toLowerCase().includes(query.toLowerCase()) ||
+          (herb.aliases?.some(alias => alias.toLowerCase().includes(query.toLowerCase())))
+        );
+
+        console.log(`從已載入的中藥資料中找到 ${filteredHerbs.length} 筆結果`);
+        return filteredHerbs;
+      }
+
+      // 嘗試從本地檔案載入並搜尋
+      try {
+        const response = await fetch('/data/powder_ratio_price.json');
+        if (response.ok) {
+          const herbs = await response.json();
+
+          const filteredHerbs = herbs.filter((herb: any) =>
+            herb.name.toLowerCase().includes(query.toLowerCase()) ||
+            (herb.aliases?.some((alias: string) =>
+              alias.toLowerCase().includes(query.toLowerCase())
+            ))
+          );
+          console.log(`從本地檔案搜尋中藥結果: ${filteredHerbs.length} 筆`);
+          return filteredHerbs;
+        }
+      } catch (localError) {
+        console.error('讀取或搜尋本地中藥數據失敗:', localError);
+      }
+
+      // 如果本地搜尋失敗，則調用API
       const endpoint = `/herbs?search=${encodeURIComponent(query)}&limit=50`;
       console.log(`使用中藥搜尋端點: ${endpoint}`);
 
@@ -506,6 +595,9 @@ export const diagnosisDataApi = {
       if (response?.items && Array.isArray(response.items)) {
         console.log(`API返回中藥搜尋結果: ${response.items.length} 筆`);
         return response.items || [];
+      } else if (Array.isArray(response)) {
+        console.log(`API返回中藥搜尋結果: ${response.length} 筆`);
+        return response;
       } else {
         console.warn('API返回的中藥搜尋結果格式不正確:', response);
         return [];
@@ -519,22 +611,45 @@ export const diagnosisDataApi = {
   // 獲取中藥粉末與飲片換算資料
   getPowderRatioPrice: async () => {
     try {
-      console.log('正在獲取中藥粉末與飲片換算資料');
-      const response = await apiClientWithRetry('get', '/herbs/powder-ratio-price');
-      console.log('成功從API獲取中藥資料，共', response.length, '筆');
-      return response || [];
-    } catch (error) {
-      console.error('從API獲取中藥粉末與飲片換算資料失敗:', error);
-      // 如果 API 調用失敗，嘗試從本地數據獲取
+      // 先嘗試從本地檔案獲取
       try {
         console.log('嘗試從本地檔案獲取中藥資料');
         const response = await fetch('/data/powder_ratio_price.json');
         if (response.ok) {
           const data = await response.json();
           console.log('成功從本地檔案獲取中藥資料，共', data.length, '筆');
+          if (data && data.length > 0) {
+            allHerbs = data;
+          }
           return data;
         } else {
           console.error('本地檔案獲取失敗:', response.statusText);
+        }
+      } catch (localError) {
+        console.error('讀取本地中藥數據失敗:', localError);
+      }
+
+      // 如果本地獲取失敗，再嘗試API
+      console.log('正在從API獲取中藥粉末與飲片換算資料');
+      const response = await apiClientWithRetry('get', '/herbs/powder-ratio-price');
+      console.log('成功從API獲取中藥資料，共', response.length, '筆');
+      if (response && response.length > 0) {
+        allHerbs = response;
+      }
+      return response || [];
+    } catch (error) {
+      console.error('從API獲取中藥粉末與飲片換算資料失敗:', error);
+      // 如果之前沒有嘗試本地檔案，再次嘗試
+      try {
+        console.log('再次嘗試從本地檔案獲取中藥資料');
+        const response = await fetch('/data/powder_ratio_price.json');
+        if (response.ok) {
+          const data = await response.json();
+          console.log('成功從本地檔案獲取中藥資料，共', data.length, '筆');
+          if (data && data.length > 0) {
+            allHerbs = data;
+          }
+          return data;
         }
       } catch (localError) {
         console.error('讀取本地中藥數據失敗:', localError);

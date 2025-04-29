@@ -12,6 +12,39 @@ interface SelectOption extends BaseSelectOption {
 }
 
 /**
+ * 通用的建立階層分類樹結構函數
+ * @param items 資料項目
+ * @param getRootItems 獲取根節點的函數
+ * @param getItemChildren 獲取子項目的函數
+ * @returns 
+ */
+function buildHierarchyTree<T extends { code: string, name: string, parent: string | null }>(
+    items: T[],
+    getRootItems: (items: T[]) => T[],
+    getItemChildren: (parent: string, items: T[]) => T[]
+): Map<string, T[]> {
+    const result = new Map<string, T[]>();
+
+    // 獲取所有根節點
+    const rootItems = getRootItems(items);
+
+    // 如果沒有根節點，返回空映射
+    if (rootItems.length === 0) {
+        return result;
+    }
+
+    // 對於每個根節點，創建一個分類，並放入所有直接子項
+    rootItems.forEach(rootItem => {
+        const children = getItemChildren(rootItem.code, items);
+        if (children.length > 0) {
+            result.set(rootItem.code, children);
+        }
+    });
+
+    return result;
+}
+
+/**
  * 將現代病名轉換為分組選項格式
  * @param data 現代病名資料陣列
  * @returns 分組後的選項格式
@@ -21,107 +54,106 @@ export const convertModernDiseasesToGroupedOptions = (data: ModernDisease[]): Gr
         return [];
     }
 
-    // 分類映射
-    const categoryMap = new Map<string, SelectOption[]>();
+    // 建立 code 到項目的映射
+    const codeToItemMap = new Map<string, ModernDisease>();
+    data.forEach(item => {
+        if (item.code) {
+            codeToItemMap.set(item.code, item);
+        }
+    });
 
-    // 處理沒有分類的項目
+    // 獲取所有頂層節點 (parent === null)
+    const getRootItems = (items: ModernDisease[]) => {
+        return items.filter(item => item.parent === null);
+    };
+
+    // 獲取某個節點的直接子項目
+    const getItemChildren = (parentCode: string, items: ModernDisease[]) => {
+        return items.filter(item => item.parent === parentCode);
+    };
+
+    // 建立階層樹結構
+    const hierarchy = buildHierarchyTree(data, getRootItems, getItemChildren);
+
+    // 將項目轉換為 SelectOption (包括處理其所有別名)
+    const convertItemToOptions = (item: ModernDisease): SelectOption[] => {
+        const options: SelectOption[] = [];
+
+        // 新增主選項
+        options.push({
+            label: item.name,
+            value: item.code,
+            notes: item.notes,
+            originalName: item.name,
+            isAlias: false
+        });
+
+        // 新增別名選項
+        if (item.aliases && item.aliases.length > 0) {
+            item.aliases.forEach(alias => {
+                if (alias) {
+                    options.push({
+                        label: `${alias} (又名: ${item.name})`,
+                        value: item.code,
+                        notes: item.notes,
+                        originalName: item.name,
+                        isAlias: true
+                    });
+                }
+            });
+        }
+
+        return options;
+    };
+
+    // 生成最終的分組選項
+    const groupedOptions: GroupedOption[] = [];
     const uncategorizedOptions: SelectOption[] = [];
 
-    // 第一階段：收集所有主選項
-    data.forEach(disease => {
-        // 只處理有名稱的項目
-        if (!disease.name) {
+    // 處理所有項目
+    data.forEach(item => {
+        // 跳過無效項目
+        if (!item.name) {
             return;
         }
 
-        // 創建選項
-        const option: SelectOption = {
-            label: disease.name,
-            value: disease.code,
-            notes: disease.notes,
-            originalName: disease.name,
-            isAlias: false
-        };
+        // 處理這個項目的所有選項
+        const options = convertItemToOptions(item);
 
-        // 根據分類進行分組
-        const categoryName = disease.category_name || '未分類';
+        // 如果這是一個頂層項目，它自己就是一個分類
+        if (item.parent === null) {
+            // 查找此頂層項目是否有子項
+            const categoryOptions = hierarchy.get(item.code) || [];
 
-        if (!categoryName || categoryName === '未分類') {
-            uncategorizedOptions.push(option);
-            return;
-        }
-
-        if (!categoryMap.has(categoryName)) {
-            categoryMap.set(categoryName, []);
-        }
-        categoryMap.get(categoryName)?.push(option);
-    });
-
-    // 第二階段：處理所有別名
-    data.forEach(disease => {
-        if (!disease.aliases || disease.aliases.length === 0) {
-            return;
-        }
-
-        disease.aliases.forEach(alias => {
-            if (!alias) {
-                return;
-            }
-
-            const aliasOption: SelectOption = {
-                label: `${alias} (又名: ${disease.name})`,
-                value: disease.code,
-                notes: disease.notes,
-                originalName: disease.name,
-                isAlias: true
-            };
-
-            // 分類處理邏輯與上面相同
-            const categoryName = disease.category_name || '未分類';
-
-            if (!categoryName || categoryName === '未分類') {
-                uncategorizedOptions.push(aliasOption);
-                return;
-            }
-
-            if (!categoryMap.has(categoryName)) {
-                categoryMap.set(categoryName, []);
-            }
-            categoryMap.get(categoryName)?.push(aliasOption);
-        });
-    });
-
-    // 將 Map 轉換為最終的分組選項格式
-    const groupedOptions: GroupedOption[] = [];
-
-    // 按照分類名稱排序
-    const sortedCategories = Array.from(categoryMap.keys()).sort();
-
-    // 建立各分類分組
-    sortedCategories.forEach(category => {
-        const options = categoryMap.get(category) || [];
-        if (options.length > 0) {
-            // 對選項進行排序
-            const sortedOptions = options.sort((a, b) => a.label.localeCompare(b.label, 'zh-Hant'));
-            groupedOptions.push({
-                label: category,
-                options: sortedOptions
+            // 收集所有子項的選項
+            const allOptions: SelectOption[] = [];
+            categoryOptions.forEach(child => {
+                allOptions.push(...convertItemToOptions(child));
             });
+
+            // 根據選項數量決定是否建立分組
+            if (allOptions.length > 0) {
+                groupedOptions.push({
+                    label: item.name,
+                    options: allOptions.sort((a, b) => a.label.localeCompare(b.label, 'zh-Hant'))
+                });
+            }
+        } else if (!hierarchy.has(item.parent)) {
+            // 如果父節點不在分類中，則歸入未分類
+            uncategorizedOptions.push(...options);
         }
     });
 
     // 處理未分類項目
     if (uncategorizedOptions.length > 0) {
-        const sortedUncategorized = uncategorizedOptions.sort((a, b) =>
-            a.label.localeCompare(b.label, 'zh-Hant'));
-
         groupedOptions.push({
             label: '未分類',
-            options: sortedUncategorized
+            options: uncategorizedOptions.sort((a, b) => a.label.localeCompare(b.label, 'zh-Hant'))
         });
     }
 
-    return groupedOptions;
+    // 排序分類
+    return groupedOptions.sort((a, b) => a.label.localeCompare(b.label, 'zh-Hant'));
 };
 
 /**
@@ -134,107 +166,106 @@ export const convertCmsyndromesToGroupedOptions = (data: Syndrome[]): GroupedOpt
         return [];
     }
 
-    // 分類映射
-    const categoryMap = new Map<string, SelectOption[]>();
+    // 建立 code 到項目的映射
+    const codeToItemMap = new Map<string, Syndrome>();
+    data.forEach(item => {
+        if (item.code) {
+            codeToItemMap.set(item.code, item);
+        }
+    });
 
-    // 處理沒有分類的項目
+    // 獲取所有頂層節點 (parent === null)
+    const getRootItems = (items: Syndrome[]) => {
+        return items.filter(item => item.parent === null);
+    };
+
+    // 獲取某個節點的直接子項目
+    const getItemChildren = (parentCode: string, items: Syndrome[]) => {
+        return items.filter(item => item.parent === parentCode);
+    };
+
+    // 建立階層樹結構
+    const hierarchy = buildHierarchyTree(data, getRootItems, getItemChildren);
+
+    // 將項目轉換為 SelectOption (包括處理其所有別名)
+    const convertItemToOptions = (item: Syndrome): SelectOption[] => {
+        const options: SelectOption[] = [];
+
+        // 新增主選項
+        options.push({
+            label: item.name,
+            value: item.code,
+            notes: item.notes,
+            originalName: item.name,
+            isAlias: false
+        });
+
+        // 新增別名選項
+        if (item.aliases && item.aliases.length > 0) {
+            item.aliases.forEach(alias => {
+                if (alias) {
+                    options.push({
+                        label: `${alias} (又名: ${item.name})`,
+                        value: item.code,
+                        notes: item.notes,
+                        originalName: item.name,
+                        isAlias: true
+                    });
+                }
+            });
+        }
+
+        return options;
+    };
+
+    // 生成最終的分組選項
+    const groupedOptions: GroupedOption[] = [];
     const uncategorizedOptions: SelectOption[] = [];
 
-    // 第一階段：收集所有主選項
-    data.forEach(syndrome => {
-        // 只處理有名稱的項目
-        if (!syndrome.name) {
+    // 處理所有項目
+    data.forEach(item => {
+        // 跳過無效項目
+        if (!item.name) {
             return;
         }
 
-        // 創建選項
-        const option: SelectOption = {
-            label: syndrome.name,
-            value: syndrome.code,
-            notes: syndrome.notes,
-            originalName: syndrome.name,
-            isAlias: false
-        };
+        // 處理這個項目的所有選項
+        const options = convertItemToOptions(item);
 
-        // 根據分類進行分組
-        const categoryName = syndrome.category_name || '未分類';
+        // 如果這是一個頂層項目，它自己就是一個分類
+        if (item.parent === null) {
+            // 查找此頂層項目是否有子項
+            const categoryOptions = hierarchy.get(item.code) || [];
 
-        if (!categoryName || categoryName === '未分類') {
-            uncategorizedOptions.push(option);
-            return;
-        }
-
-        if (!categoryMap.has(categoryName)) {
-            categoryMap.set(categoryName, []);
-        }
-        categoryMap.get(categoryName)?.push(option);
-    });
-
-    // 第二階段：處理所有別名
-    data.forEach(syndrome => {
-        if (!syndrome.aliases || syndrome.aliases.length === 0) {
-            return;
-        }
-
-        syndrome.aliases.forEach(alias => {
-            if (!alias) {
-                return;
-            }
-
-            const aliasOption: SelectOption = {
-                label: `${alias} (又名: ${syndrome.name})`,
-                value: syndrome.code,
-                notes: syndrome.notes,
-                originalName: syndrome.name,
-                isAlias: true
-            };
-
-            // 分類處理邏輯與上面相同
-            const categoryName = syndrome.category_name || '未分類';
-
-            if (!categoryName || categoryName === '未分類') {
-                uncategorizedOptions.push(aliasOption);
-                return;
-            }
-
-            if (!categoryMap.has(categoryName)) {
-                categoryMap.set(categoryName, []);
-            }
-            categoryMap.get(categoryName)?.push(aliasOption);
-        });
-    });
-
-    // 將 Map 轉換為最終的分組選項格式
-    const groupedOptions: GroupedOption[] = [];
-
-    // 按照分類名稱排序
-    const sortedCategories = Array.from(categoryMap.keys()).sort();
-
-    // 建立各分類分組
-    sortedCategories.forEach(category => {
-        const options = categoryMap.get(category) || [];
-        if (options.length > 0) {
-            // 對選項進行排序
-            const sortedOptions = options.sort((a, b) => a.label.localeCompare(b.label, 'zh-Hant'));
-            groupedOptions.push({
-                label: category,
-                options: sortedOptions
+            // 收集所有子項的選項
+            const allOptions: SelectOption[] = [];
+            categoryOptions.forEach(child => {
+                allOptions.push(...convertItemToOptions(child));
             });
+
+            // 根據選項數量決定是否建立分組
+            if (allOptions.length > 0) {
+                groupedOptions.push({
+                    label: item.name,
+                    options: allOptions.sort((a, b) => a.label.localeCompare(b.label, 'zh-Hant'))
+                });
+            }
+        } else if (!hierarchy.has(item.parent)) {
+            // 如果父節點不在分類中，則歸入未分類
+            uncategorizedOptions.push(...options);
         }
     });
 
     // 處理未分類項目
     if (uncategorizedOptions.length > 0) {
-        const sortedUncategorized = uncategorizedOptions.sort((a, b) =>
-            a.label.localeCompare(b.label, 'zh-Hant'));
-
         groupedOptions.push({
             label: '未分類',
-            options: sortedUncategorized
+            options: uncategorizedOptions.sort((a, b) => a.label.localeCompare(b.label, 'zh-Hant'))
         });
     }
 
-    return groupedOptions;
+    // 排序分類
+    return groupedOptions.sort((a, b) => a.label.localeCompare(b.label, 'zh-Hant'));
 };
 
 /**
@@ -247,107 +278,106 @@ export const convertCmPrinciplesToGroupedOptions = (data: Principle[]): GroupedO
         return [];
     }
 
-    // 分類映射
-    const categoryMap = new Map<string, SelectOption[]>();
+    // 建立 code 到項目的映射
+    const codeToItemMap = new Map<string, Principle>();
+    data.forEach(item => {
+        if (item.code) {
+            codeToItemMap.set(item.code, item);
+        }
+    });
 
-    // 處理沒有分類的項目
+    // 獲取所有頂層節點 (parent === null)
+    const getRootItems = (items: Principle[]) => {
+        return items.filter(item => item.parent === null);
+    };
+
+    // 獲取某個節點的直接子項目
+    const getItemChildren = (parentCode: string, items: Principle[]) => {
+        return items.filter(item => item.parent === parentCode);
+    };
+
+    // 建立階層樹結構
+    const hierarchy = buildHierarchyTree(data, getRootItems, getItemChildren);
+
+    // 將項目轉換為 SelectOption (包括處理其所有別名)
+    const convertItemToOptions = (item: Principle): SelectOption[] => {
+        const options: SelectOption[] = [];
+
+        // 新增主選項
+        options.push({
+            label: item.name,
+            value: item.code,
+            notes: item.notes,
+            originalName: item.name,
+            isAlias: false
+        });
+
+        // 新增別名選項
+        if (item.aliases && item.aliases.length > 0) {
+            item.aliases.forEach(alias => {
+                if (alias) {
+                    options.push({
+                        label: `${alias} (又名: ${item.name})`,
+                        value: item.code,
+                        notes: item.notes,
+                        originalName: item.name,
+                        isAlias: true
+                    });
+                }
+            });
+        }
+
+        return options;
+    };
+
+    // 生成最終的分組選項
+    const groupedOptions: GroupedOption[] = [];
     const uncategorizedOptions: SelectOption[] = [];
 
-    // 第一階段：收集所有主選項
-    data.forEach(principle => {
-        // 只處理有名稱的項目
-        if (!principle.name) {
+    // 處理所有項目
+    data.forEach(item => {
+        // 跳過無效項目
+        if (!item.name) {
             return;
         }
 
-        // 創建選項
-        const option: SelectOption = {
-            label: principle.name,
-            value: principle.code,
-            notes: principle.notes,
-            originalName: principle.name,
-            isAlias: false
-        };
+        // 處理這個項目的所有選項
+        const options = convertItemToOptions(item);
 
-        // 根據分類進行分組
-        const categoryName = principle.category_name || '未分類';
+        // 如果這是一個頂層項目，它自己就是一個分類
+        if (item.parent === null) {
+            // 查找此頂層項目是否有子項
+            const categoryOptions = hierarchy.get(item.code) || [];
 
-        if (!categoryName || categoryName === '未分類') {
-            uncategorizedOptions.push(option);
-            return;
-        }
-
-        if (!categoryMap.has(categoryName)) {
-            categoryMap.set(categoryName, []);
-        }
-        categoryMap.get(categoryName)?.push(option);
-    });
-
-    // 第二階段：處理所有別名
-    data.forEach(principle => {
-        if (!principle.aliases || principle.aliases.length === 0) {
-            return;
-        }
-
-        principle.aliases.forEach(alias => {
-            if (!alias) {
-                return;
-            }
-
-            const aliasOption: SelectOption = {
-                label: `${alias} (又名: ${principle.name})`,
-                value: principle.code,
-                notes: principle.notes,
-                originalName: principle.name,
-                isAlias: true
-            };
-
-            // 分類處理邏輯與上面相同
-            const categoryName = principle.category_name || '未分類';
-
-            if (!categoryName || categoryName === '未分類') {
-                uncategorizedOptions.push(aliasOption);
-                return;
-            }
-
-            if (!categoryMap.has(categoryName)) {
-                categoryMap.set(categoryName, []);
-            }
-            categoryMap.get(categoryName)?.push(aliasOption);
-        });
-    });
-
-    // 將 Map 轉換為最終的分組選項格式
-    const groupedOptions: GroupedOption[] = [];
-
-    // 按照分類名稱排序
-    const sortedCategories = Array.from(categoryMap.keys()).sort();
-
-    // 建立各分類分組
-    sortedCategories.forEach(category => {
-        const options = categoryMap.get(category) || [];
-        if (options.length > 0) {
-            // 對選項進行排序
-            const sortedOptions = options.sort((a, b) => a.label.localeCompare(b.label, 'zh-Hant'));
-            groupedOptions.push({
-                label: category,
-                options: sortedOptions
+            // 收集所有子項的選項
+            const allOptions: SelectOption[] = [];
+            categoryOptions.forEach(child => {
+                allOptions.push(...convertItemToOptions(child));
             });
+
+            // 根據選項數量決定是否建立分組
+            if (allOptions.length > 0) {
+                groupedOptions.push({
+                    label: item.name,
+                    options: allOptions.sort((a, b) => a.label.localeCompare(b.label, 'zh-Hant'))
+                });
+            }
+        } else if (!hierarchy.has(item.parent)) {
+            // 如果父節點不在分類中，則歸入未分類
+            uncategorizedOptions.push(...options);
         }
     });
 
     // 處理未分類項目
     if (uncategorizedOptions.length > 0) {
-        const sortedUncategorized = uncategorizedOptions.sort((a, b) =>
-            a.label.localeCompare(b.label, 'zh-Hant'));
-
         groupedOptions.push({
             label: '未分類',
-            options: sortedUncategorized
+            options: uncategorizedOptions.sort((a, b) => a.label.localeCompare(b.label, 'zh-Hant'))
         });
     }
 
-    return groupedOptions;
+    // 排序分類
+    return groupedOptions.sort((a, b) => a.label.localeCompare(b.label, 'zh-Hant'));
 };
 
 /**

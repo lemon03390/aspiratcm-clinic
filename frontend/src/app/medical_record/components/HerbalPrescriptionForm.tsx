@@ -71,7 +71,7 @@ interface HerbalPrescriptionFormProps {
 
 // 使用 forwardRef 包裝組件
 const HerbalPrescriptionForm = forwardRef<
-  { addHerb: (herbData: any) => void },
+  { addHerb: (herbData: any) => void; resetForm: () => void },
   HerbalPrescriptionFormProps
 >(({ initialValues, onSave }, ref) => {
   const defaultPrescription: HerbalPrescriptionData = {
@@ -502,47 +502,51 @@ const HerbalPrescriptionForm = forwardRef<
     onSave(processPrescriptionData());
   };
 
-  // 暴露方法給父組件
+  // 使用 useImperativeHandle 暴露方法給父組件
   useImperativeHandle(ref, () => ({
+    // 添加藥材方法
     addHerb: (herbData: any) => {
+      // 檢查藥材是否已存在於處方中
+      const exists = prescription.herbs.some(herb =>
+        herb.code === herbData.code || herb.name === herbData.name
+      );
+
+      if (exists) {
+        alert(`處方中已存在相同藥材：${herbData.name}`);
+        return;
+      }
+
+      // 添加新藥材
       const newHerb: HerbItem = {
         id: Date.now().toString(),
         code: herbData.code || '',
         name: herbData.name || '',
         brand: herbData.brand || '',
-        powder_amount: herbData.recommended_amount || '',
+        powder_amount: herbData.amount || '3',
         decoction_amount: '',
         price_per_gram: herbData.price_per_gram || 0,
-        total_price: 0,
-        unit: herbData.unit || 'g',
-        is_compound: herbData.is_compound || false,
+        total_price: (parseFloat(herbData.amount || '3') * (herbData.price_per_gram || 0)) || 0,
+        unit: 'g',
+        is_compound: false,
         concentration_ratio: herbData.concentration_ratio || 1,
         decoction_equivalent_per_g: herbData.decoction_equivalent_per_g || 1,
         inventory_status: InventoryStatus.UNKNOWN,
         source: herbData.source || 'AI_suggested'
       };
 
-      // 如果有推薦劑量，計算相關數值
-      if (newHerb.powder_amount) {
-        const powderAmount = parseFloat(newHerb.powder_amount);
-        if (!isNaN(powderAmount)) {
-          // 計算飲片量
-          const decoctionAmount = calculateDecoctionAmount(
-            powderAmount,
-            newHerb.decoction_equivalent_per_g,
-            newHerb.concentration_ratio
-          );
-          newHerb.decoction_amount = decoctionAmount.toFixed(1);
-
-          // 計算價格
-          newHerb.total_price = powderAmount * newHerb.price_per_gram;
-        }
-      }
-
       setPrescription(prev => ({
         ...prev,
         herbs: [...prev.herbs, newHerb]
       }));
+    },
+
+    // 重置表單方法
+    resetForm: () => {
+      console.log('重置中藥處方表單');
+      setPrescription({
+        ...defaultPrescription,
+        herbs: [createEmptyHerbItem()]
+      });
     }
   }));
 
