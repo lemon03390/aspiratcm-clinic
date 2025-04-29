@@ -197,12 +197,11 @@ const PatientForm: React.FC = () => {
           const response = await checkIdNumber(formData.id_number);
           if (response.exists) {
             setMessage({
-              type: 'error',
-              text: '此身份證/護照號碼已存在，請選擇複診或修改號碼。'
+              type: 'info',
+              text: '此身份證/護照號碼已存在，系統將自動使用覆診流程。若要建立新患者，請確認身份證是否正確。'
             });
-            // 可以選擇在這裡自動切換到複診模式並加載患者資料
+            // 可以自動切換到覆診模式，但不自動加載資料，讓使用者確認
             // setIsInitialVisit(false);
-            // setFormData({...response.patient});
           } else {
             setMessage(null);
           }
@@ -463,12 +462,12 @@ const PatientForm: React.FC = () => {
       setHasDrugAllergy(!patient.drug_allergies.some(d => d.includes('我沒有')));
       setHasFoodAllergy(!patient.food_allergies.some(d => d.includes('我沒有')));
 
-      // 設置欄位為唯讀，但主診醫師可選
+      // 設置欄位為唯讀，但健康資訊和主診醫師可選
       setFieldsReadOnly(true);
 
       setMessage({
         type: 'success',
-        text: `已找到患者: ${patient.chinese_name} (${patient.registration_number})`
+        text: `已找到患者: ${patient.chinese_name} (${patient.registration_number})，請選擇主診醫師並完成覆診掛號`
       });
     } catch (error: any) {
       console.error('查詢患者失敗:', error);
@@ -483,10 +482,40 @@ const PatientForm: React.FC = () => {
 
   // 允許重新編輯覆診患者資料
   const handleEditFields = () => {
-    setFieldsReadOnly(false);
+    // 之前的實現只是顯示消息，不實際解除唯讀
+    setFieldsReadOnly(false); // 解除唯讀狀態
+
+    // 添加日誌確認唯讀狀態已被解除
+    console.log('✅ 已解除唯讀狀態，fieldsReadOnly =', false);
+
+    // 確保在解除唯讀狀態後能夠訪問所有必要欄位
+    // 特別是性別、身份證等重要欄位
+
+    // 移除任何可能阻止編輯的樣式或屬性
+    setTimeout(() => {
+      // 使用延遲執行確保React已更新DOM
+      const selectFields = document.querySelectorAll('select[name="gender"]');
+      const inputFields = document.querySelectorAll('input[name="id_number"], input[name="birth_date"], input[name="chinese_name"]');
+
+      // 移除禁用狀態和唯讀屬性
+      selectFields.forEach(field => {
+        if (field instanceof HTMLSelectElement) {
+          field.disabled = false;
+          console.log('✓ 已解除性別欄位的禁用狀態');
+        }
+      });
+
+      inputFields.forEach(field => {
+        if (field instanceof HTMLInputElement) {
+          field.readOnly = false;
+          console.log(`✓ 已解除 ${field.name} 欄位的唯讀狀態`);
+        }
+      });
+    }, 100);
+
     setMessage({
       type: 'info',
-      text: '您現在可以編輯患者資料'
+      text: '您現在可以編輯患者資料。請注意，修改基本個人資料可能影響醫療記錄的一致性。'
     });
   };
 
@@ -613,24 +642,36 @@ const PatientForm: React.FC = () => {
       // 初始化處理後的數據
       const processedData = { ...formData };
 
-      // 強制處理 email 欄位 - 確保空欄位轉為 no@no.com
-      console.log("處理 email 之前:", processedData.email, typeof processedData.email);
-
-      // 明確檢查所有可能的空值情況，並確保使用特定的 no@no.com 值
-      if (processedData.email === undefined ||
-        processedData.email === null ||
-        processedData.email === '' ||
-        processedData.email === 'undefined' ||
-        (typeof processedData.email === 'string' && processedData.email.trim() === '')) {
+      // 處理 email
+      if (!processedData.email ||
+        processedData.email === "" ||
+        processedData.email === "undefined" ||
+        (typeof processedData.email === "string" && processedData.email.trim() === "")) {
+        console.log("處理 email 之前:", processedData.email, typeof processedData.email);
         console.log("Email 欄位無效，設置為 no@no.com");
-        processedData.email = 'no@no.com';
-      } else if (typeof processedData.email === 'string' && !(/^[^\s@]+@[^\s@]+\.[^\s@]+$/).test(processedData.email)) {
-        console.log("Email 格式不正確:", processedData.email);
-        console.log("自動轉換為 no@no.com");
-        processedData.email = 'no@no.com';
+        processedData.email = "no@no.com";
       }
 
       console.log("處理 email 之後:", processedData.email);
+
+      // 檢查患者是否已存在，若存在則自動切換為覆診模式
+      if (isInitialVisit) {
+        try {
+          const checkResponse = await checkIdNumber(processedData.id_number);
+          if (checkResponse.exists) {
+            console.log('初診流程發現患者已存在，自動轉為覆診流程');
+            setMessage({
+              type: 'info',
+              text: '此身份證號碼已存在，系統將自動使用覆診流程'
+            });
+            // 此處僅記錄存在情況，createPatient 函數內會自動處理為覆診邏輯
+            // 不需變更其他流程
+          }
+        } catch (error) {
+          // 忽略檢查錯誤，繼續流程
+          console.log('檢查患者是否存在時出錯，繼續流程:', error);
+        }
+      }
 
       // 處理基礎疾病
       if (processedData.basic_diseases.includes('其他，請列明') && otherBasicDisease.trim()) {
@@ -653,7 +694,7 @@ const PatientForm: React.FC = () => {
         }
       }
 
-      // 處理藥物過敏
+      // 處理藥物過敏 
       if (processedData.drug_allergies.includes('其他藥物，請列明') && otherDrugAllergy.trim()) {
         // 創建新的陣列，避免修改原有陣列
         const newDrugAllergies = [...processedData.drug_allergies];
@@ -704,10 +745,10 @@ const PatientForm: React.FC = () => {
         console.log('最終安全檢查: 設置 email 為 no@no.com');
       }
 
-      // 提交表單數據
+      // 提交表單數據 - API 會自動處理初診/覆診邏輯
       const response = await createPatient(processedData);
 
-      console.log('✅ 患者創建成功:', response);
+      console.log('✅ 患者創建/更新成功:', response);
 
       // 保存成功的數據，用於顯示成功卡片
       const doctorName = referenceData?.doctors?.find(d => d.id === formData.doctor_id)?.name || '未知醫師';
@@ -726,7 +767,7 @@ const PatientForm: React.FC = () => {
 
       setMessage({
         type: 'success',
-        text: `患者登記成功！掛號編號: ${response.registration_number}`
+        text: `患者${isInitialVisit ? '登記' : '覆診'}成功！掛號編號: ${response.registration_number}`
       });
 
       // 清空基本表單狀態
@@ -787,20 +828,76 @@ const PatientForm: React.FC = () => {
           text: '連接伺服器失敗，請檢查網絡連接並稍後再試'
         });
       } else if (error.response) {
+        // 特殊處理 409 錯誤 - 患者已存在
+        if (error.response.status === 409) {
+          // 提供明確的指引信息和操作建議
+          // 檢查錯誤信息是否包含特定關鍵詞
+          const errorMessage = error.message || '';
+
+          if (errorMessage.includes('請先切換到覆診模式') || errorMessage.includes('請切換到覆診模式')) {
+            // 如果API返回的訊息中有明確指引，則使用該訊息
+            setMessage({
+              type: 'info',
+              text: error.message
+            });
+
+            // 在1秒後自動切換到覆診模式並清空搜尋欄位
+            setTimeout(() => {
+              setIsInitialVisit(false); // 切換到覆診模式
+              setSearchQuery(formData.id_number || formData.phone_number || ''); // 使用當前身份證號碼或電話
+              setMessage({
+                type: 'info',
+                text: '系統已自動切換為覆診模式，請點擊「搜尋」按鈕查詢患者資料'
+              });
+            }, 1000);
+          } else {
+            // 一般409錯誤處理
+            setMessage({
+              type: 'info',
+              text: '此患者已存在，系統嘗試自動處理為覆診流程但未成功。請手動切換到覆診模式並搜尋患者資料。'
+            });
+          }
+        }
+        // 特殊處理 404 錯誤 - 找不到患者
+        else if (error.response.status === 404) {
+          // 檢查是否處於覆診模式
+          if (!isInitialVisit) {
+            // 在覆診模式下收到404，表示患者不存在
+            setMessage({
+              type: 'error',
+              text: '系統找不到此患者記錄。如果是新患者，請切換到初診模式進行登記。'
+            });
+          } else {
+            // 在初診模式下收到404，可能是API問題
+            setMessage({
+              type: 'info',
+              text: '系統處理患者資料時遇到問題，正在嘗試自動恢復。請稍後再試或聯絡技術支援。'
+            });
+          }
+        }
         // 其他 HTTP 錯誤
-        setMessage({
-          type: 'error',
-          text: `伺服器錯誤 (${error.response.status}): ${error.response.data?.detail ||
-            error.response.data?.message ||
-            error.message ||
-            '請稍後再試'
-            }`
-        });
+        else {
+          let errorText = '';
+
+          // 嘗試從錯誤信息中提取更有用的內容
+          if (error.message && (error.message.includes('患者') || error.message.includes('病人') || error.message.includes('覆診'))) {
+            // 如果錯誤信息包含相關關鍵詞，優先使用
+            errorText = error.message;
+          } else {
+            // 一般錯誤處理
+            errorText = `系統處理請求時發生錯誤 (${error.response.status})，請稍後再試或聯絡櫃檯人員`;
+          }
+
+          setMessage({
+            type: 'error',
+            text: errorText
+          });
+        }
       } else {
         // 未知錯誤
         setMessage({
           type: 'error',
-          text: `錯誤: ${error.message || '提交表單時發生未知錯誤'}`
+          text: error.message || '發生未知錯誤，請稍後再試'
         });
       }
     } finally {
@@ -1089,12 +1186,12 @@ const PatientForm: React.FC = () => {
                     }`}
                   onClick={() => handleVisitTypeChange(false)}
                 >
-                  複診
+                  覆診
                 </button>
               </div>
             </div>
 
-            {/* 複診搜尋 */}
+            {/* 覆診搜尋 */}
             {!isInitialVisit && (
               <div className="mb-6 p-4 bg-blue-50 rounded-md border border-blue-200">
                 <div className="text-blue-700 mb-2">覆診病人需先輸入身份證或電話搜尋現有紀錄</div>
@@ -1130,7 +1227,7 @@ const PatientForm: React.FC = () => {
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
                   </svg>
-                  重新編輯
+                  編輯患者資料
                 </button>
               </div>
             )}
@@ -1239,7 +1336,8 @@ const PatientForm: React.FC = () => {
                   value={formData.gender}
                   onChange={handleInputChange}
                   required
-                  className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  disabled={fieldsReadOnly} // 添加 disabled 屬性，覆診模式下禁用
+                  className={`mt-1 block w-full px-3 py-2 ${fieldsReadOnly ? 'bg-gray-100' : 'bg-white'} border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
                 >
                   <option value="">請選擇</option>
                   <option value="男">男</option>

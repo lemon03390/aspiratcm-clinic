@@ -202,88 +202,234 @@ export async function createPatient(patientData: PatientCreateRequest): Promise<
 
     console.log("API 最終請求數據:", JSON.stringify(processedData));
 
-    // 首先檢查該身份證號碼是否已存在
+    // 先嘗試直接檢查患者是否存在 - 不論是初診還是覆診，都先檢查身份證和電話
     try {
-      const checkResponse = await checkIdNumber(processedData.id_number);
+      // 方法1: 檢查身份證號碼
+      if (processedData.id_number) {
+        console.log(`首先嘗試通過身份證號碼檢查患者是否存在: ${processedData.id_number}`);
+        const checkResponse = await checkIdNumber(processedData.id_number);
 
-      // 如果患者存在，則使用PATCH請求更新該患者資料
-      if (checkResponse.exists && checkResponse.patient) {
-        console.log('患者已存在，更新現有記錄而非創建新記錄');
-        const patientId = checkResponse.patient.id;
-
-        // 使用updatePatient函數更新現有患者資料
-        const updateData: PatientUpdateRequest = {
-          chinese_name: processedData.chinese_name,
-          english_name: processedData.english_name,
-          birth_date: processedData.birth_date,
-          phone_number: processedData.phone_number,
-          email: processedData.email,
-          gender: processedData.gender,
-          basic_diseases: processedData.basic_diseases,
-          drug_allergies: processedData.drug_allergies,
-          food_allergies: processedData.food_allergies,
-          note: processedData.note,
-          doctor_id: processedData.doctor_id,
-          data_source: processedData.data_source,
-          region: processedData.region,
-          district: processedData.district,
-          sub_district: processedData.sub_district
-        };
-
-        const updatedPatient = await updatePatient(patientId, updateData);
-        console.log('✅ 患者資料更新成功:', updatedPatient);
-        return updatedPatient;
-      }
-    } catch (checkError) {
-      // 檢查失敗，忽略錯誤並繼續嘗試創建新患者
-      console.log('檢查患者是否存在時出錯，嘗試直接創建:', checkError);
-    }
-
-    // 如果患者不存在或檢查失敗，則創建新患者
-    const url = ensureHttps(getBackendUrl('/patient_registration/'));
-    console.log('🔷 提交患者數據到:', url);
-    const response = await axios.post<Patient>(url, processedData);
-    console.log('✅ 患者創建成功:', response.data);
-    return response.data;
-  } catch (error: any) {
-    console.error('❌ 創建患者失敗:', error);
-
-    // 處理 409 衝突錯誤（患者已存在）
-    if (error.response && error.response.status === 409) {
-      try {
-        // 獲取現有患者資料
-        const checkResponse = await checkIdNumber(patientData.id_number);
         if (checkResponse.exists && checkResponse.patient) {
-          console.log('處理409衝突: 患者已存在，嘗試更新資料');
+          console.log('發現患者已存在，自動處理為覆診流程');
           const patientId = checkResponse.patient.id;
 
-          // 準備更新數據
+          // 使用updatePatient函數更新現有患者資料
           const updateData: PatientUpdateRequest = {
-            chinese_name: patientData.chinese_name,
-            english_name: patientData.english_name,
-            birth_date: patientData.birth_date,
-            phone_number: patientData.phone_number,
-            email: patientData.email,
-            gender: patientData.gender,
-            basic_diseases: patientData.basic_diseases,
-            drug_allergies: patientData.drug_allergies,
-            food_allergies: patientData.food_allergies,
-            note: patientData.note,
-            doctor_id: patientData.doctor_id,
-            data_source: patientData.data_source,
-            region: patientData.region,
-            district: patientData.district,
-            sub_district: patientData.sub_district
+            // 注意：只更新允許在覆診時修改的欄位
+            doctor_id: processedData.doctor_id,
+            note: processedData.note,
+            // 更新健康資訊
+            basic_diseases: processedData.basic_diseases,
+            drug_allergies: processedData.drug_allergies,
+            food_allergies: processedData.food_allergies,
+            // 添加主訴
+            chief_complaint: processedData.chief_complaint,
           };
 
-          // 更新患者資料
           const updatedPatient = await updatePatient(patientId, updateData);
-          console.log('✅ 成功處理409衝突並更新患者資料:', updatedPatient);
+          console.log('✅ 患者覆診資料更新成功:', updatedPatient);
           return updatedPatient;
         }
-      } catch (recoveryError) {
-        console.error('恢復409衝突時出錯:', recoveryError);
-        // 如果恢復失敗，繼續拋出原始錯誤
+      }
+
+      // 方法2: 檢查電話號碼
+      if (processedData.phone_number) {
+        console.log(`嘗試通過電話號碼檢查患者是否存在: ${processedData.phone_number}`);
+        try {
+          const patient = await getPatientByPhoneNumber(processedData.phone_number);
+          if (patient) {
+            console.log('通過電話號碼找到現有患者，自動處理為覆診流程');
+            const patientId = patient.id;
+
+            // 使用updatePatient函數更新現有患者資料
+            const updateData: PatientUpdateRequest = {
+              doctor_id: processedData.doctor_id,
+              note: processedData.note,
+              basic_diseases: processedData.basic_diseases,
+              drug_allergies: processedData.drug_allergies,
+              food_allergies: processedData.food_allergies,
+              chief_complaint: processedData.chief_complaint,
+            };
+
+            const updatedPatient = await updatePatient(patientId, updateData);
+            console.log('✅ 通過電話號碼找到患者並更新成功:', updatedPatient);
+            return updatedPatient;
+          }
+        } catch (phoneError) {
+          console.log('使用電話號碼查詢患者失敗，繼續嘗試其他方法:', phoneError);
+        }
+      }
+    } catch (preCheckError) {
+      // 直接檢查失敗，記錄錯誤並繼續嘗試提交流程
+      console.log('預先檢查患者是否存在時出錯，繼續嘗試提交流程:', preCheckError);
+    }
+
+    // 如果患者不存在或前期檢查失敗，則嘗試創建新患者或處理衝突
+    const url = ensureHttps(getBackendUrl('/patient_registration/'));
+    console.log('🔷 提交患者數據到:', url);
+
+    try {
+      const response = await axios.post<Patient>(url, processedData);
+      console.log('✅ 患者創建成功:', response.data);
+      return response.data;
+    } catch (postError: any) {
+      console.error('❌ POST 請求失敗，檢查錯誤類型:', postError);
+
+      // 處理 409 衝突錯誤（患者已存在） - 增強處理邏輯
+      if (postError.response && postError.response.status === 409) {
+        console.log('處理409衝突: 患者已存在，嘗試獲取患者信息並自動處理為覆診流程');
+
+        try {
+          // 嘗試通過多種方式獲取患者信息
+          let patient = null;
+          let patientId = null;
+
+          // 方法1: 從錯誤響應中提取患者ID
+          if (postError.response.data && postError.response.data.patient_id) {
+            patientId = postError.response.data.patient_id;
+            console.log(`從409響應中獲取患者ID: ${patientId}`);
+            try {
+              patient = await getPatientById(patientId);
+            } catch (idError) {
+              console.log(`通過ID ${patientId} 獲取患者失敗:`, idError);
+            }
+          }
+
+          // 方法2: 從錯誤響應中提取詳細數據
+          if (!patient && postError.response.data && postError.response.data.detail) {
+            const detailText = postError.response.data.detail;
+            console.log('分析錯誤詳情尋找患者ID:', detailText);
+
+            // 嘗試從detail文本中提取患者ID
+            const idMatch = /patient_id: (\d+)/.exec(detailText) || /patient id: (\d+)/.exec(detailText) || /id: (\d+)/.exec(detailText);
+            if (idMatch && idMatch[1]) {
+              patientId = parseInt(idMatch[1]);
+              console.log(`從錯誤詳情中提取到患者ID: ${patientId}`);
+              try {
+                patient = await getPatientById(patientId);
+              } catch (idError) {
+                console.log(`通過提取的ID ${patientId} 獲取患者失敗:`, idError);
+              }
+            }
+          }
+
+          // 方法3: 使用身份證檢查
+          if (!patient && processedData.id_number) {
+            console.log(`使用身份證再次檢查獲取患者: ${processedData.id_number}`);
+            try {
+              const checkResponse = await checkIdNumber(processedData.id_number);
+              if (checkResponse.exists && checkResponse.patient) {
+                patient = checkResponse.patient;
+                patientId = patient.id;
+              }
+            } catch (idError) {
+              console.log('使用身份證查詢失敗:', idError);
+            }
+          }
+
+          // 方法4: 使用電話號碼查詢
+          if (!patient && processedData.phone_number) {
+            console.log(`使用電話號碼再次嘗試獲取患者: ${processedData.phone_number}`);
+            try {
+              patient = await getPatientByPhoneNumber(processedData.phone_number);
+              if (patient) {
+                patientId = patient.id;
+              }
+            } catch (phoneError) {
+              console.log('使用電話號碼查詢失敗:', phoneError);
+            }
+          }
+
+          // 如果找到患者，更新資料
+          if (patient && patientId) {
+            console.log('成功找到現有患者記錄:', patient);
+
+            // 準備更新數據 - 只更新允許的欄位
+            const updateData: PatientUpdateRequest = {
+              // 不更新個人基本資料
+              doctor_id: processedData.doctor_id,
+              note: processedData.note,
+              // 添加主訴
+              chief_complaint: processedData.chief_complaint,
+              // 更新健康資訊
+              basic_diseases: processedData.basic_diseases,
+              drug_allergies: processedData.drug_allergies,
+              food_allergies: processedData.food_allergies,
+            };
+
+            // 嘗試使用多個 API 路徑
+            try {
+              console.log(`嘗試使用主要 API 路徑更新患者 ID ${patientId}`);
+              // 使用 patient_registration API 端點更新患者資料
+              const updatedPatient = await updatePatient(patientId, updateData);
+              console.log('✅ 成功處理409衝突並更新患者覆診資料:', updatedPatient);
+              return updatedPatient;
+            } catch (updateError) {
+              console.error('使用主要 API 路徑更新患者失敗，嘗試備用方法:', updateError);
+
+              // 備用方法: 嘗試覆診專用端點
+              try {
+                const revisitUrl = ensureHttps(getBackendUrl('/patients/revisit'));
+                console.log('嘗試使用覆診專用端點:', revisitUrl);
+
+                // 將完整數據發送到覆診端點
+                const fullRevisitData = {
+                  ...processedData,
+                  patient_id: patientId
+                };
+
+                const revisitResponse = await axios.post<Patient>(revisitUrl, fullRevisitData);
+                console.log('✅ 使用覆診專用端點成功:', revisitResponse.data);
+                return revisitResponse.data;
+              } catch (revisitError) {
+                console.error('覆診專用端點也失敗:', revisitError);
+                throw new Error('此患者已存在，但系統無法自動完成掛號。請先切換到覆診模式，然後搜尋此患者資料再提交。');
+              }
+            }
+          } else {
+            console.warn('409錯誤處理: 仍然無法找到相關患者信息，嘗試最後的應急方法');
+
+            // 最後嘗試: 使用另一個端點進行覆診更新
+            try {
+              const fallbackUrl = ensureHttps(getBackendUrl('/patients/revisit'));
+              console.log('嘗試使用覆診專用端點:', fallbackUrl);
+              const fallbackResponse = await axios.post<Patient>(fallbackUrl, processedData);
+              console.log('✅ 使用覆診專用端點成功:', fallbackResponse.data);
+              return fallbackResponse.data;
+            } catch (fallbackError) {
+              console.error('覆診專用端點也失敗:', fallbackError);
+              // 繼續拋出友善的錯誤信息而非原始錯誤
+              throw new Error('此患者已存在，但系統無法自動完成掛號。請先切換到覆診模式，然後搜尋此患者資料再提交。');
+            }
+          }
+        } catch (recoveryError) {
+          console.error('恢復409衝突時出錯:', recoveryError);
+          // 提供更友好的錯誤信息
+          throw new Error('此患者已在系統中，但系統無法自動處理為覆診流程。請切換到覆診模式，搜尋患者後再提交。');
+        }
+      }
+
+      // 非409錯誤，繼續處理其他類型錯誤
+      throw postError;
+    }
+  } catch (error: any) {
+    console.error('❌ 創建患者失敗，處理各種錯誤情況:', error);
+
+    // 處理 404 錯誤 - 患者不存在
+    if (error.response && error.response.status === 404) {
+      // 患者可能不存在，轉為創建流程
+      console.log('患者不存在，嘗試創建新患者');
+      try {
+        // 嘗試使用另一個 endpoint 來創建
+        const altUrl = ensureHttps(getBackendUrl('/patients/'));
+        console.log('🔷 使用替代 API 端點嘗試創建患者:', altUrl);
+        const response = await axios.post<Patient>(altUrl, patientData);
+        console.log('✅ 使用替代端點成功創建患者:', response.data);
+        return response.data;
+      } catch (altError) {
+        console.error('使用替代端點創建患者失敗:', altError);
+        // 使用更友善的錯誤信息
+        throw new Error('無法創建患者記錄，請稍後再試或聯絡櫃檯人員協助。');
       }
     }
 
@@ -325,11 +471,17 @@ export async function createPatient(patientData: PatientCreateRequest): Promise<
     // 處理其他類型的錯誤
     if (error.response) {
       console.error(`服務器回應 ${error.response.status} 錯誤:`, error.response.data);
-      const enhancedError: any = new Error(
-        error.response.data?.detail ||
-        error.response.data?.message ||
-        `伺服器回應錯誤 (${error.response.status})`
-      );
+      // 提供更友善的錯誤信息
+      let errorMessage = '系統處理請求時發生錯誤，請稍後再試';
+
+      // 根據不同錯誤狀態提供不同的友好信息
+      if (error.response.status === 401 || error.response.status === 403) {
+        errorMessage = '您沒有權限執行此操作，請聯絡系統管理員';
+      } else if (error.response.status >= 500) {
+        errorMessage = '系統內部錯誤，請稍後再試或聯絡技術支援';
+      }
+
+      const enhancedError: any = new Error(errorMessage);
       enhancedError.response = error.response;
       enhancedError.status = error.response.status;
       throw enhancedError;
@@ -448,7 +600,8 @@ export async function getPatientByPhoneNumber(phoneNumber: string): Promise<Pati
 // 更新患者資料
 export async function updatePatient(id: number, updateData: PatientUpdateRequest): Promise<Patient> {
   try {
-    const url = ensureHttps(getBackendUrl(`/patients/${id}`));
+    const url = ensureHttps(getBackendUrl(`/patient_registration/${id}`));
+    console.log(`嘗試更新患者 ID ${id}，URL: ${url}`);
     const response = await axios.patch<Patient>(url, updateData);
     return response.data;
   } catch (error) {
@@ -459,6 +612,22 @@ export async function updatePatient(id: number, updateData: PatientUpdateRequest
       console.error(`API響應狀態: ${error.response.status}`);
       console.error(`請求URL: ${error.config?.url}`);
       console.error(`回應數據: `, error.response.data);
+
+      // 如果是 404 錯誤，嘗試使用備用端點
+      if (error.response.status === 404) {
+        console.log(`主要患者更新端點返回 404，嘗試備用端點...`);
+        try {
+          // 嘗試使用備用 API 路徑
+          const fallbackUrl = ensureHttps(getBackendUrl(`/patients/update/${id}`));
+          console.log(`嘗試使用備用 API 路徑更新患者 ID ${id}，URL: ${fallbackUrl}`);
+          const response = await axios.patch<Patient>(fallbackUrl, updateData);
+          return response.data;
+        } catch (fallbackError) {
+          console.error(`備用患者更新端點也失敗:`, fallbackError);
+          throw new Error(`更新患者資料失敗(${error.response.status}): 可能是程式邏輯錯誤，請通知技術人員`);
+        }
+      }
+
       throw new Error(`更新患者資料失敗(${error.response.status}): 可能是程式邏輯錯誤，請通知技術人員`);
     }
 
@@ -469,7 +638,9 @@ export async function updatePatient(id: number, updateData: PatientUpdateRequest
 // 刪除患者
 export async function deletePatient(id: number): Promise<void> {
   try {
-    const url = ensureHttps(getBackendUrl(`/patients/${id}`));
+    // 先嘗試使用 patient_registration 端點
+    const url = ensureHttps(getBackendUrl(`/patient_registration/${id}`));
+    console.log(`嘗試刪除患者 ID ${id}，URL: ${url}`);
     await axios.delete(url);
   } catch (error) {
     console.error(`刪除患者 ID ${id} 失敗:`, error);
@@ -479,9 +650,23 @@ export async function deletePatient(id: number): Promise<void> {
       console.error(`API響應狀態: ${error.response.status}`);
       console.error(`請求URL: ${error.config?.url}`);
       console.error(`回應數據: `, error.response.data);
+
+      // 如果是 404 錯誤，嘗試使用備用端點
+      if (error.response.status === 404) {
+        try {
+          // 嘗試使用備用 API 路徑
+          const fallbackUrl = ensureHttps(getBackendUrl(`/patients/${id}`));
+          console.log(`嘗試使用備用 API 路徑刪除患者，URL: ${fallbackUrl}`);
+          await axios.delete(fallbackUrl);
+          return;
+        } catch (fallbackError) {
+          console.error(`備用患者刪除端點也失敗:`, fallbackError);
+        }
+      }
+
       throw new Error(`刪除患者資料失敗(${error.response.status}): 可能是程式邏輯錯誤，請通知技術人員`);
     }
 
     throw error;
   }
-} 
+}

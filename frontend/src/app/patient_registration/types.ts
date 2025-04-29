@@ -9,24 +9,24 @@ export interface Patient {
   phone_number: string;
   email?: string;
   gender?: string;
-  
+
   // 健康相關資訊
   basic_diseases: string[];
   drug_allergies: string[];
   food_allergies: string[];
   note?: string;
-  
+
   // 預約相關
   registration_datetime: string;
   has_appointment: boolean;
   doctor_id?: number;
   data_source: string;
-  
+
   // 地區資訊
   region: string;
   district: string;
   sub_district: string;
-  
+
   // 系統欄位
   created_at: string;
   updated_at: string;
@@ -41,17 +41,17 @@ export interface PatientCreateRequest {
   phone_number: string;
   email?: string;
   gender?: string;
-  
+
   basic_diseases: string[];
   drug_allergies: string[];
   food_allergies: string[];
   note?: string;
   chief_complaint?: string;
-  
+
   has_appointment: boolean;
   doctor_id?: number;
   data_source: string;
-  
+
   region: string;
   district: string;
   sub_district: string;
@@ -65,15 +65,16 @@ export interface PatientUpdateRequest {
   phone_number?: string;
   email?: string;
   gender?: string;
-  
+
   basic_diseases?: string[];
   drug_allergies?: string[];
   food_allergies?: string[];
   note?: string;
-  
+  chief_complaint?: string;
+
   doctor_id?: number;
   data_source?: string;
-  
+
   region?: string;
   district?: string;
   sub_district?: string;

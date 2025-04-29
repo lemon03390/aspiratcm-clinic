@@ -150,13 +150,14 @@ const HerbalPrescriptionForm = forwardRef<
 
   // 計算處方總價和每服單價
   useEffect(() => {
-    const totalPrice = prescription.herbs.reduce((sum, herb) => {
+    // 藥材小計總和作為每服價格
+    const perDosePrice = prescription.herbs.reduce((sum, herb) => {
       return sum + herb.total_price;
     }, 0);
 
-    // 計算每服價格
+    // 總價 = 每服價格 × 天數 × 每日服用次數
     const totalDoses = prescription.structured_instructions.total_days * prescription.structured_instructions.times_per_day;
-    const perDosePrice = totalDoses > 0 ? totalPrice / totalDoses : 0;
+    const totalPrice = perDosePrice * totalDoses;
 
     setPrescription(prev => ({
       ...prev,
@@ -423,7 +424,9 @@ const HerbalPrescriptionForm = forwardRef<
         if (herb.id === id) {
           const numAmount = parseFloat(amount) || 0;
           let decoctionAmount = '';
-          let totalPrice = 0;
+
+          // 小計 = 藥粉量 × 每克單價
+          let totalPrice = numAmount * (herb.price_per_gram || 0);
 
           if (numAmount > 0) {
             // 計算飲片量
@@ -433,9 +436,6 @@ const HerbalPrescriptionForm = forwardRef<
               herb.concentration_ratio
             );
             decoctionAmount = decoctionValue.toFixed(1);
-
-            // 計算價格 - 確保使用有效的價格
-            totalPrice = numAmount * (herb.price_per_gram || 0);
           }
 
           return {
@@ -469,7 +469,7 @@ const HerbalPrescriptionForm = forwardRef<
             );
             powderAmount = powderValue.toFixed(1);
 
-            // 計算價格 - 確保使用有效的價格
+            // 小計 = 藥粉量 × 每克單價
             totalPrice = powderValue * (herb.price_per_gram || 0);
           }
 
@@ -708,9 +708,9 @@ const HerbalPrescriptionForm = forwardRef<
         herbs: selectedTemplate.herbs,
         instructions: selectedTemplate.instructions,
         structured_instructions: selectedTemplate.structured_instructions,
-        total_price: selectedTemplate.herbs.reduce((sum: number, herb: any) => sum + herb.total_price, 0),
-        per_dose_price: selectedTemplate.herbs.reduce((sum: number, herb: any) => sum + herb.total_price, 0) /
-          (selectedTemplate.structured_instructions.total_days * selectedTemplate.structured_instructions.times_per_day)
+        total_price: selectedTemplate.herbs.reduce((sum: number, herb: any) => sum + herb.total_price, 0) *
+          selectedTemplate.structured_instructions.total_days * selectedTemplate.structured_instructions.times_per_day,
+        per_dose_price: selectedTemplate.herbs.reduce((sum: number, herb: any) => sum + herb.total_price, 0)
       });
 
       alert('處方模板載入成功');

@@ -796,6 +796,13 @@ export default function MedicalRecordPage() {
         if (herbPrescriptionRef.current && typeof herbPrescriptionRef.current.resetForm === 'function') {
           setTimeout(() => {
             if (herbPrescriptionRef.current) {
+              // 每服價格 = 所有藥材小計總和
+              const perDosePrice = herbItems.reduce((sum, herb) => sum + (herb.total_price || 0), 0);
+              // 總服數 = 天數 × 每日次數
+              const totalDoses = 7 * 2; // 假設是7天，每天2次
+              // 總價 = 每服價格 × 總服數
+              const totalPrice = perDosePrice * totalDoses;
+
               const prescriptionData = {
                 herbs: herbItems,
                 instructions: recordDetail.prescription.instructions || '',
@@ -804,8 +811,8 @@ export default function MedicalRecordPage() {
                   times_per_day: 2,
                   timing: '早晚服'
                 },
-                total_price: herbItems.reduce((sum, herb) => sum + (herb.total_price || 0), 0),
-                per_dose_price: herbItems.reduce((sum, herb) => sum + (herb.total_price || 0), 0) / 14 // 假設是7天，每天2次
+                total_price: totalPrice,
+                per_dose_price: perDosePrice
               };
               herbPrescriptionRef.current.resetForm();
               handlePrescriptionFormSave(prescriptionData);
@@ -889,15 +896,25 @@ export default function MedicalRecordPage() {
             is_compound: herb.structured_data?.is_compound || false
           }));
 
+          // 設定結構化服藥指示
+          const structuredInstructions = record.prescription.structured_data?.structured_instructions || {
+            total_days: 7,
+            times_per_day: 2,
+            timing: '早晚服'
+          };
+
+          // 計算每服總價
+          const perDosePrice = herbItems.reduce((sum, herb) => sum + (herb.total_price || 0), 0);
+
+          // 計算總價
+          const totalDoses = structuredInstructions.total_days * structuredInstructions.times_per_day;
+          const totalPrice = perDosePrice * totalDoses;
+
           setFormData(prev => ({
             ...prev,
             prescription: herbItems,
             prescription_instructions: record.prescription.instructions || '',
-            prescription_structured_instructions: record.prescription.structured_instructions || {
-              total_days: 7,
-              times_per_day: 2,
-              timing: '早晚服'
-            }
+            prescription_structured_instructions: structuredInstructions
           }));
 
           alert('已成功複製上次處方');
@@ -1099,11 +1116,11 @@ export default function MedicalRecordPage() {
                     })),
                     instructions: formData.prescription_instructions || '',
                     structured_instructions: formData.prescription_structured_instructions,
-                    total_price: formData.prescription.reduce((sum, item) => sum + (item.total_price || 0), 0),
-                    per_dose_price: formData.prescription.length > 0
-                      ? formData.prescription.reduce((sum, item) => sum + (item.total_price || 0), 0) /
+                    // 每服價格 = 所有藥材小計總和
+                    per_dose_price: formData.prescription.reduce((sum, item) => sum + (item.total_price || 0), 0),
+                    // 總價 = 每服價格 × 天數 × 每日次數
+                    total_price: formData.prescription.reduce((sum, item) => sum + (item.total_price || 0), 0) *
                       (formData.prescription_structured_instructions.total_days * formData.prescription_structured_instructions.times_per_day)
-                      : 0
                   }}
                   onSave={handlePrescriptionFormSave}
                   ref={herbPrescriptionRef}
