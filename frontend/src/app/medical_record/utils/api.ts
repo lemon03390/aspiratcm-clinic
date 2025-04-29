@@ -242,12 +242,24 @@ export const medicalRecordApi = {
 
         // 移除原始結構化診斷數據
         delete transformedData.diagnosis_structured;
+      } else if (!transformedData.diagnosis) {
+        // 如果沒有診斷資料，創建空的診斷結構
+        transformedData.diagnosis = {
+          modern_diseases: [],
+          cm_syndromes: [],
+          cm_principle: ''
+        };
       }
 
       // 轉換處方藥材為後端所需格式
       if (cleanedData.prescription && Array.isArray(cleanedData.prescription)) {
         transformedData.prescription = {
           instructions: cleanStringField(cleanedData.prescription_instructions || ""),
+          structured_instructions: cleanedData.prescription_structured_instructions || {
+            total_days: 7,
+            times_per_day: 2,
+            timing: '早晚服'
+          },
           herbs: cleanedData.prescription.map((herb, index) => ({
             herb_name: herb.name || '',
             amount: herb.amount || herb.powder_amount || '0',
@@ -266,15 +278,31 @@ export const medicalRecordApi = {
       }
 
       // 確保將藥物從陣列轉換為物件
-      if (transformedData.prescription && !transformedData.prescription.herbs) {
+      if (!transformedData.prescription) {
         transformedData.prescription = {
           instructions: "",
+          structured_instructions: {
+            total_days: 7,
+            times_per_day: 2,
+            timing: '早晚服'
+          },
+          herbs: []
+        };
+      } else if (transformedData.prescription && !transformedData.prescription.herbs) {
+        transformedData.prescription = {
+          instructions: transformedData.prescription_instructions || "",
+          structured_instructions: transformedData.prescription_structured_instructions || {
+            total_days: 7,
+            times_per_day: 2,
+            timing: '早晚服'
+          },
           herbs: transformedData.prescription
         };
       }
 
       // 移除不需要的欄位
       delete transformedData.prescription_instructions;
+      delete transformedData.prescription_structured_instructions;
 
       console.log('轉換後準備發送的病歷資料:', transformedData);
       return await apiClientWithRetry('post', '/medical-records', transformedData);
@@ -307,7 +335,7 @@ export const patientApi = {
         throw new Error('缺少有效的患者ID');
       }
 
-      const response = await apiClientWithRetry('get', `/patients/${patientId}`);
+      const response = await apiClientWithRetry('get', `/patient_registration/${patientId}`);
 
       // 增強的資料清理，確保關鍵欄位格式正確
       const cleanedData = defensiveDataCleaning(response);

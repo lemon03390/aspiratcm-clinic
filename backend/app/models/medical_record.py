@@ -66,6 +66,7 @@ class Prescription(Base):
     prescription_id = Column(String(50), unique=True, index=True, nullable=False, 
                             default=lambda: f"RX-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}")
     instructions = Column(Text, nullable=True)
+    structured_data = Column(JSON, nullable=True)
     created_at = Column(DateTime, nullable=False, default=func.now())
     updated_at = Column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
 

@@ -50,10 +50,19 @@ interface HerbItem {
   source?: string; // 可以是 'manual' 或 'AI_suggested'
 }
 
+// 結構化服法說明
+interface StructuredInstructions {
+  total_days: number;
+  times_per_day: number;
+  timing: string;
+}
+
 interface HerbalPrescriptionData {
   herbs: HerbItem[];
   instructions: string; // 服法說明
+  structured_instructions: StructuredInstructions; // 結構化服法
   total_price: number;
+  per_dose_price: number; // 每服單價
 }
 
 interface InventoryCheckResult {
@@ -77,7 +86,13 @@ const HerbalPrescriptionForm = forwardRef<
   const defaultPrescription: HerbalPrescriptionData = {
     herbs: [],
     instructions: '',
-    total_price: 0
+    structured_instructions: {
+      total_days: 7,
+      times_per_day: 2,
+      timing: '早晚服'
+    },
+    total_price: 0,
+    per_dose_price: 0
   };
 
   const [prescription, setPrescription] = useState<HerbalPrescriptionData>(
@@ -133,17 +148,22 @@ const HerbalPrescriptionForm = forwardRef<
     loadHerbs();
   }, []);
 
-  // 計算處方總價
+  // 計算處方總價和每服單價
   useEffect(() => {
-    const total = prescription.herbs.reduce((sum, herb) => {
+    const totalPrice = prescription.herbs.reduce((sum, herb) => {
       return sum + herb.total_price;
     }, 0);
 
+    // 計算每服價格
+    const totalDoses = prescription.structured_instructions.total_days * prescription.structured_instructions.times_per_day;
+    const perDosePrice = totalDoses > 0 ? totalPrice / totalDoses : 0;
+
     setPrescription(prev => ({
       ...prev,
-      total_price: total
+      total_price: totalPrice,
+      per_dose_price: perDosePrice
     }));
-  }, [prescription.herbs]);
+  }, [prescription.herbs, prescription.structured_instructions.total_days, prescription.structured_instructions.times_per_day]);
 
   // 搜尋中藥名稱
   const searchMedicines = async (searchTerm: string): Promise<SelectOption[]> => {
@@ -473,6 +493,35 @@ const HerbalPrescriptionForm = forwardRef<
     }));
   };
 
+  // 處理結構化服法參數變更
+  const handleStructuredInstructionsChange = (field: keyof StructuredInstructions, value: string | number) => {
+    // 處理數值轉換，確保為整數
+    const numValue = typeof value === 'string' ? parseInt(value) || 0 : value;
+
+    setPrescription(prev => ({
+      ...prev,
+      structured_instructions: {
+        ...prev.structured_instructions,
+        [field]: numValue
+      },
+      // 同時更新傳統格式的服法說明
+      instructions: `共${numValue}天，每日${prev.structured_instructions.times_per_day}次，${prev.structured_instructions.timing}`
+    }));
+  };
+
+  // 處理結構化服法文本變更（如「早晚服」）
+  const handleTimingChange = (value: string) => {
+    setPrescription(prev => ({
+      ...prev,
+      structured_instructions: {
+        ...prev.structured_instructions,
+        timing: value
+      },
+      // 同時更新傳統格式的服法說明
+      instructions: `共${prev.structured_instructions.total_days}天，每日${prev.structured_instructions.times_per_day}次，${value}`
+    }));
+  };
+
   const processPrescriptionData = () => {
     return {
       herbs: prescription.herbs.map(herb => ({
@@ -493,7 +542,9 @@ const HerbalPrescriptionForm = forwardRef<
         ingredients: herb.ingredients
       })),
       instructions: prescription.instructions,
-      total_price: prescription.total_price
+      structured_instructions: prescription.structured_instructions,
+      total_price: prescription.total_price,
+      per_dose_price: prescription.per_dose_price
     };
   };
 
@@ -614,6 +665,7 @@ const HerbalPrescriptionForm = forwardRef<
         name: templateName,
         herbs: prescription.herbs,
         instructions: prescription.instructions,
+        structured_instructions: prescription.structured_instructions,
         created_at: new Date().toISOString()
       };
 
@@ -655,7 +707,10 @@ const HerbalPrescriptionForm = forwardRef<
       setPrescription({
         herbs: selectedTemplate.herbs,
         instructions: selectedTemplate.instructions,
-        total_price: selectedTemplate.herbs.reduce((sum: number, herb: any) => sum + herb.total_price, 0)
+        structured_instructions: selectedTemplate.structured_instructions,
+        total_price: selectedTemplate.herbs.reduce((sum: number, herb: any) => sum + herb.total_price, 0),
+        per_dose_price: selectedTemplate.herbs.reduce((sum: number, herb: any) => sum + herb.total_price, 0) /
+          (selectedTemplate.structured_instructions.total_days * selectedTemplate.structured_instructions.times_per_day)
       });
 
       alert('處方模板載入成功');
@@ -823,15 +878,61 @@ const HerbalPrescriptionForm = forwardRef<
           </div>
         </div>
 
-        {/* 服法說明 */}
+        {/* 服法說明 - 改為結構化欄位 */}
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-600">服法</label>
-          <textarea
+          <div className="flex flex-wrap gap-4 items-center">
+            <div className="flex items-center">
+              <span className="mr-2">共</span>
+              <select
+                value={prescription.structured_instructions.total_days}
+                onChange={(e) => handleStructuredInstructionsChange('total_days', e.target.value)}
+                className="p-1.5 border border-gray-300 rounded-md w-16 text-center"
+              >
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 14, 21, 28].map(days => (
+                  <option key={days} value={days}>{days}</option>
+                ))}
+              </select>
+              <span className="ml-2">天</span>
+            </div>
+
+            <div className="flex items-center">
+              <span className="mr-2">每日</span>
+              <select
+                value={prescription.structured_instructions.times_per_day}
+                onChange={(e) => handleStructuredInstructionsChange('times_per_day', e.target.value)}
+                className="p-1.5 border border-gray-300 rounded-md w-16 text-center"
+              >
+                {[1, 2, 3, 4].map(times => (
+                  <option key={times} value={times}>{times}</option>
+                ))}
+              </select>
+              <span className="ml-2">次</span>
+            </div>
+
+            <div className="flex items-center">
+              <select
+                value={prescription.structured_instructions.timing}
+                onChange={(e) => handleTimingChange(e.target.value)}
+                className="p-1.5 border border-gray-300 rounded-md"
+              >
+                <option value="早晚服">早晚服</option>
+                <option value="午晚服">午晚服</option>
+                <option value="三餐服">三餐服</option>
+                <option value="早中晚服">早中晚服</option>
+                <option value="睡前服">睡前服</option>
+                <option value="飯前服">飯前服</option>
+                <option value="飯後服">飯後服</option>
+                <option value="自行安排">自行安排</option>
+              </select>
+            </div>
+          </div>
+          <input
+            type="text"
             value={prescription.instructions}
             onChange={(e) => handleInstructionsChange(e.target.value)}
-            placeholder="例如：共7天，每日兩次，早晚服"
-            className="w-full p-2 border border-gray-300 rounded-md"
-            rows={2}
+            placeholder="自定義服法說明"
+            className="w-full p-2 border border-gray-300 rounded-md mt-2"
           />
         </div>
 
@@ -849,8 +950,13 @@ const HerbalPrescriptionForm = forwardRef<
           </div>
 
           {showPriceInfo && (
-            <div className="text-right p-2 bg-blue-50 rounded-md">
-              <p className="text-xl font-bold text-blue-700">處方總價: <span>{prescription.total_price.toFixed(2)} HKD</span></p>
+            <div className="text-right p-2 bg-blue-50 rounded-md space-y-1">
+              <p className="text-sm font-medium text-blue-600">
+                每服處方價錢: <span>{prescription.per_dose_price.toFixed(2)} HKD</span>
+              </p>
+              <p className="text-xl font-bold text-blue-700">
+                處方總價: <span>{prescription.total_price.toFixed(2)} HKD</span>
+              </p>
             </div>
           )}
         </div>

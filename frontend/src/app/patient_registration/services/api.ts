@@ -357,7 +357,7 @@ export async function getPatients(params?: { skip?: number; limit?: number }): P
 // 通過ID獲取患者
 export async function getPatientById(id: number): Promise<Patient> {
   try {
-    const url = ensureHttps(getBackendUrl(`/patients/${id}`));
+    const url = ensureHttps(getBackendUrl(`/patient_registration/${id}`));
     const response = await axios.get<Patient>(url);
     return response.data;
   } catch (error) {

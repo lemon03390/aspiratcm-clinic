@@ -28,8 +28,15 @@ class HerbItemCreate(BaseModel):
     structured_data: Optional[Dict[str, Any]] = None
 
 
+class StructuredInstructions(BaseModel):
+    total_days: Optional[int] = 7
+    times_per_day: Optional[int] = 2
+    timing: Optional[str] = "早晚服"
+
+
 class PrescriptionCreate(BaseModel):
     instructions: Optional[str] = None
+    structured_instructions: Optional[StructuredInstructions] = None
     herbs: List[HerbItemCreate]
 
 
@@ -82,6 +89,7 @@ class PrescriptionResponse(BaseModel):
     id: int
     prescription_id: str
     instructions: Optional[str] = None
+    structured_instructions: Optional[StructuredInstructions] = None
     herbs: List[HerbItemResponse]
 
     class Config:
@@ -187,6 +195,19 @@ def create_medical_record(medical_record: MedicalRecordCreate, db: Session = Dep
                 medical_record_id=db_record.id,
                 instructions=medical_record.prescription.instructions
             )
+            
+            # 儲存結構化服法為JSON
+            if medical_record.prescription.structured_instructions:
+                # 如果prescription.structured_data不存在，則初始化為空字典
+                if not hasattr(prescription, 'structured_data') or prescription.structured_data is None:
+                    prescription.structured_data = {}
+                
+                # 將structured_instructions存入structured_data字典
+                prescription.structured_data = {
+                    "structured_instructions": medical_record.prescription.structured_instructions.dict(),
+                    **(prescription.structured_data or {})
+                }
+            
             db.add(prescription)
             db.flush()  # 確保處方有ID
 
@@ -266,6 +287,21 @@ def get_medical_record(record_id: str, db: Session = Depends(get_db)):
         if hasattr(db_record, 'observation') and (db_record.observation is None or db_record.observation == {} or isinstance(db_record.observation, dict) and not db_record.observation):
             db_record.observation = ""
         
+        # 處理處方的結構化服法數據
+        if db_record.prescriptions and len(db_record.prescriptions) > 0:
+            prescription = db_record.prescriptions[0]
+            # 如果有structured_data且包含structured_instructions
+            if hasattr(prescription, 'structured_data') and prescription.structured_data and 'structured_instructions' in prescription.structured_data:
+                # 將結構化服法數據設置到prescription中
+                setattr(prescription, 'structured_instructions', prescription.structured_data.get('structured_instructions'))
+            else:
+                # 若無，提供默認值
+                setattr(prescription, 'structured_instructions', {
+                    "total_days": 7,
+                    "times_per_day": 2,
+                    "timing": "早晚服"
+                })
+        
         # 為診斷資料添加證候詳細資訊並確保列表類型正確
         if db_record.diagnoses and len(db_record.diagnoses) > 0:
             # 取得最新的診斷
@@ -321,8 +357,23 @@ def get_patient_medical_records(
     # 為診斷資料添加證候詳細資訊
     for record in records:
         # 清理數據格式
-        if hasattr(record, 'observation') and (record.observation == {} or record.observation is None):
+        if hasattr(record, 'observation') and (record.observation is None or record.observation == {} or isinstance(record.observation, dict) and not record.observation):
             record.observation = ""
+        
+        # 處理處方的結構化服法數據
+        if record.prescriptions and len(record.prescriptions) > 0:
+            prescription = record.prescriptions[0]
+            # 如果有structured_data且包含structured_instructions
+            if hasattr(prescription, 'structured_data') and prescription.structured_data and 'structured_instructions' in prescription.structured_data:
+                # 將結構化服法數據設置到prescription中
+                setattr(prescription, 'structured_instructions', prescription.structured_data.get('structured_instructions'))
+            else:
+                # 若無，提供默認值
+                setattr(prescription, 'structured_instructions', {
+                    "total_days": 7,
+                    "times_per_day": 2,
+                    "timing": "早晚服"
+                })
         
         if record.diagnoses and record.diagnoses[0]:
             # 取得最新的診斷
@@ -577,11 +628,26 @@ def get_medical_records_by_patient(
         
         # 為診斷資料添加證候詳細資訊
         for record in records:
-            # 增強數據清理：確保 observation 格式正確
+            # 清理數據格式
             if hasattr(record, 'observation') and (record.observation is None or record.observation == {} or isinstance(record.observation, dict) and not record.observation):
                 record.observation = ""
-                
-            if record.diagnoses and len(record.diagnoses) > 0:
+            
+            # 處理處方的結構化服法數據
+            if record.prescriptions and len(record.prescriptions) > 0:
+                prescription = record.prescriptions[0]
+                # 如果有structured_data且包含structured_instructions
+                if hasattr(prescription, 'structured_data') and prescription.structured_data and 'structured_instructions' in prescription.structured_data:
+                    # 將結構化服法數據設置到prescription中
+                    setattr(prescription, 'structured_instructions', prescription.structured_data.get('structured_instructions'))
+                else:
+                    # 若無，提供默認值
+                    setattr(prescription, 'structured_instructions', {
+                        "total_days": 7,
+                        "times_per_day": 2,
+                        "timing": "早晚服"
+                    })
+            
+            if record.diagnoses and record.diagnoses[0]:
                 # 取得最新的診斷
                 diagnosis = record.diagnoses[0]
                 

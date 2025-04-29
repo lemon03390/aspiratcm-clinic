@@ -134,7 +134,13 @@ export default function MedicalRecordPage() {
       unit?: string;
       is_compound?: boolean;
     }[],
-    treatmentMethods: [] as string[]
+    treatmentMethods: [] as string[],
+    prescription_instructions: '',
+    prescription_structured_instructions: {
+      total_days: 7,
+      times_per_day: 2,
+      timing: '早晚服'
+    }
   });
 
   // 新增儲存原始診斷資料，以便轉換結構化診斷
@@ -172,7 +178,13 @@ export default function MedicalRecordPage() {
         cmPrinciple: ''
       },
       prescription: [],
-      treatmentMethods: []
+      treatmentMethods: [],
+      prescription_instructions: '',
+      prescription_structured_instructions: {
+        total_days: 7,
+        times_per_day: 2,
+        timing: '早晚服'
+      }
     };
 
     // 重置原始診斷資料
@@ -483,7 +495,13 @@ export default function MedicalRecordPage() {
   const handlePrescriptionFormSave = (data: {
     herbs: any[];
     instructions: string;
+    structured_instructions: {
+      total_days: number;
+      times_per_day: number;
+      timing: string;
+    };
     total_price: number;
+    per_dose_price: number;
   }) => {
     setFormData(prev => ({
       ...prev,
@@ -499,7 +517,9 @@ export default function MedicalRecordPage() {
         total_price: herb.total_price,
         unit: herb.unit || 'g',
         is_compound: herb.is_compound
-      }))
+      })),
+      prescription_instructions: data.instructions,
+      prescription_structured_instructions: data.structured_instructions
     }));
     console.log('已更新中藥處方:', data);
   };
@@ -579,7 +599,12 @@ export default function MedicalRecordPage() {
           total_price: herb.total_price || 0,
           is_compound: herb.is_compound || false
         })),
-        prescription_instructions: '',
+        prescription_instructions: formData.prescription_instructions || '',
+        prescription_structured_instructions: formData.prescription_structured_instructions || {
+          total_days: 7,
+          times_per_day: 2,
+          timing: '早晚服'
+        },
         treatment_methods: formData.treatmentMethods
       };
 
@@ -716,12 +741,119 @@ export default function MedicalRecordPage() {
       const recordDetail = await medicalRecordApi.getRecordById(recordId);
       console.log('病歷詳情:', recordDetail);
 
-      // 在實際應用中，可以顯示病歷詳情彈窗或跳轉到詳情頁面
-      alert(`病歷詳情已獲取，ID: ${recordId}`);
+      // 設置診斷數據
+      if (recordDetail.diagnosis) {
+        // 處理診斷數據
+        const diagnosisData = {
+          modernDiseases: recordDetail.diagnosis.modern_diseases?.map(disease => ({
+            code: typeof disease === 'string' ? disease : '',
+            name: typeof disease === 'string' ? disease : ''
+          })) || [],
+          cmSyndromes: recordDetail.diagnosis.cm_syndromes?.map(syndrome => ({
+            code: typeof syndrome === 'string' ? syndrome : '',
+            name: typeof syndrome === 'string' ? syndrome : ''
+          })) || [],
+          cmPrinciple: recordDetail.diagnosis.cm_principle ? [{
+            code: recordDetail.diagnosis.cm_principle,
+            name: recordDetail.diagnosis.cm_principle
+          }] : []
+        };
+
+        setRawDiagnosisData(diagnosisData);
+
+        setFormData(prev => ({
+          ...prev,
+          diagnosis: {
+            modernDiseases: diagnosisData.modernDiseases.map(d => d.name || ''),
+            cmSyndromes: diagnosisData.cmSyndromes.map(d => d.name || ''),
+            cmPrinciple: diagnosisData.cmPrinciple.map(d => d.name || '').join('、') || ''
+          }
+        }));
+      }
+
+      // 設置處方數據
+      if (recordDetail.prescription && recordDetail.prescription.herbs) {
+        const herbItems = recordDetail.prescription.herbs.map(herb => ({
+          id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
+          code: herb.structured_data?.code || '',
+          name: herb.herb_name,
+          brand: herb.structured_data?.brand || '',
+          amount: herb.amount,
+          powder_amount: herb.amount,
+          decoction_amount: '',
+          price_per_gram: herb.structured_data?.price_per_gram || 0,
+          total_price: herb.structured_data?.total_price || 0,
+          unit: herb.unit || 'g',
+          is_compound: herb.structured_data?.is_compound || false
+        }));
+
+        setFormData(prev => ({
+          ...prev,
+          prescription: herbItems
+        }));
+
+        // 如果處方組件引用存在，重設其數據
+        if (herbPrescriptionRef.current && typeof herbPrescriptionRef.current.resetForm === 'function') {
+          setTimeout(() => {
+            if (herbPrescriptionRef.current) {
+              const prescriptionData = {
+                herbs: herbItems,
+                instructions: recordDetail.prescription.instructions || '',
+                structured_instructions: {
+                  total_days: 7,
+                  times_per_day: 2,
+                  timing: '早晚服'
+                },
+                total_price: herbItems.reduce((sum, herb) => sum + (herb.total_price || 0), 0),
+                per_dose_price: herbItems.reduce((sum, herb) => sum + (herb.total_price || 0), 0) / 14 // 假設是7天，每天2次
+              };
+              herbPrescriptionRef.current.resetForm();
+              handlePrescriptionFormSave(prescriptionData);
+            }
+          }, 100);
+        }
+      }
+
+      // 設置觀察數據
+      if (recordDetail.observation || recordDetail.left_pulse || recordDetail.right_pulse || recordDetail.tongue_quality) {
+        // 解析或構建觀察數據
+        const observationData = {
+          leftPulse: recordDetail.left_pulse?.split('、') || [],
+          rightPulse: recordDetail.right_pulse?.split('、') || [],
+          tongueQuality: recordDetail.tongue_quality?.split('、') || [],
+          tongueShape: recordDetail.tongue_shape?.split('、') || [],
+          tongueColor: recordDetail.tongue_color?.split('、') || [],
+          tongueCoating: recordDetail.tongue_coating?.split('、') || []
+        };
+
+        setFormData(prev => ({
+          ...prev,
+          observation: {
+            ...prev.observation,
+            leftPulse: recordDetail.left_pulse || '',
+            rightPulse: recordDetail.right_pulse || '',
+            tongueQuality: recordDetail.tongue_quality || '',
+            tongueShape: recordDetail.tongue_shape || '',
+            tongueColor: recordDetail.tongue_color || '',
+            tongueCoating: recordDetail.tongue_coating || ''
+          }
+        }));
+      }
+
+      // 設置主訴與現病史
+      if (recordDetail.chief_complaint || recordDetail.present_illness) {
+        setFormData(prev => ({
+          ...prev,
+          chiefComplaint: recordDetail.chief_complaint || '',
+          presentIllness: recordDetail.present_illness || ''
+        }));
+      }
+
+      toast.success(`已載入 ${new Date(recordDetail.created_at).toLocaleDateString('zh-TW')} 的診療記錄`);
 
     } catch (error) {
       console.error(`獲取病歷詳情失敗，ID: ${recordId}:`, error);
-      alert('獲取病歷詳情失敗');
+      toast.error('獲取病歷詳情失敗');
     } finally {
       setIsLoading(false);
     }
@@ -741,12 +873,33 @@ export default function MedicalRecordPage() {
     medicalRecordApi.getRecordById(latestRecordId)
       .then(record => {
         // 假設 record 中有 prescription_structured 欄位包含結構化的處方資料
-        if (record.prescription_structured && Array.isArray(record.prescription_structured)) {
+        if (record.prescription && record.prescription.herbs) {
           // 更新處方資料
+          const herbItems = record.prescription.herbs.map(herb => ({
+            id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
+            code: herb.structured_data?.code || '',
+            name: herb.herb_name,
+            brand: herb.structured_data?.brand || '',
+            amount: herb.amount,
+            powder_amount: herb.amount,
+            decoction_amount: '',
+            price_per_gram: herb.structured_data?.price_per_gram || 0,
+            total_price: herb.structured_data?.total_price || 0,
+            unit: herb.unit || 'g',
+            is_compound: herb.structured_data?.is_compound || false
+          }));
+
           setFormData(prev => ({
             ...prev,
-            prescription: record.prescription_structured
+            prescription: herbItems,
+            prescription_instructions: record.prescription.instructions || '',
+            prescription_structured_instructions: record.prescription.structured_instructions || {
+              total_days: 7,
+              times_per_day: 2,
+              timing: '早晚服'
+            }
           }));
+
           alert('已成功複製上次處方');
         } else {
           // 如果沒有結構化資料，顯示提示
@@ -944,8 +1097,13 @@ export default function MedicalRecordPage() {
                       decoction_equivalent_per_g: 1,
                       inventory_status: 'normal' as InventoryStatus
                     })),
-                    instructions: '',
-                    total_price: formData.prescription.reduce((sum, item) => sum + (item.total_price || 0), 0)
+                    instructions: formData.prescription_instructions || '',
+                    structured_instructions: formData.prescription_structured_instructions,
+                    total_price: formData.prescription.reduce((sum, item) => sum + (item.total_price || 0), 0),
+                    per_dose_price: formData.prescription.length > 0
+                      ? formData.prescription.reduce((sum, item) => sum + (item.total_price || 0), 0) /
+                      (formData.prescription_structured_instructions.total_days * formData.prescription_structured_instructions.times_per_day)
+                      : 0
                   }}
                   onSave={handlePrescriptionFormSave}
                   ref={herbPrescriptionRef}
