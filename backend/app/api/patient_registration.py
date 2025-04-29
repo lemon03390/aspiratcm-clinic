@@ -335,12 +335,31 @@ def process_waiting_entries(db: Session, entries: List[WaitingList]) -> List[dic
 # 通過掛號編號獲取患者
 @router.get("/by-registration-number/{registration_number}", response_model=PatientResponse)
 async def get_patient_by_registration_number(registration_number: str, db: Session = Depends(get_db)):
-    if not (patient := db.query(Patient).filter(Patient.registration_number == registration_number).first()):
+    try:
+        if not registration_number:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="掛號編號不能為空"
+            )
+        
+        # 嘗試查詢患者資料
+        patient = db.query(Patient).filter(Patient.registration_number == registration_number).first()
+        if not patient:
+            logger.warning(f"掛號編號為 {registration_number} 的患者不存在")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"掛號編號為 {registration_number} 的患者不存在"
+            )
+        return patient
+    except HTTPException:
+        # 直接重新拋出HTTP異常
+        raise
+    except Exception as e:
+        logger.error(f"獲取患者資料失敗，掛號編號: {registration_number}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"掛號編號為 {registration_number} 的患者不存在"
-        )
-    return patient
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"獲取患者資料失敗，掛號編號: {registration_number}"
+        ) from e
 
 
 # 通過電話號碼獲取患者

@@ -1,81 +1,156 @@
 /**
- * 清理字串欄位，確保輸出為有效字串
- * 將空物件、null、undefined 等非字串值轉換為空字串
- * 
- * @param value 任何輸入值
- * @returns 清理後的字串
+ * 將空或無效的字串欄位轉為空字串
  */
-export const cleanStringField = (value: any): string => {
-    // 如果值為空 (null, undefined)，返回空字串
-    if (value === null || value === undefined) {
+export function cleanStringField(value: any): string {
+    if (value === null || value === undefined ||
+        (typeof value === 'object' && (
+            Object.keys(value).length === 0 ||
+            (Array.isArray(value) && value.length === 0)
+        ))) {
         return '';
     }
 
-    // 如果值已經是字串，直接返回
+    // 如果是物件但非空物件，嘗試將其轉為 JSON 字串
+    if (typeof value === 'object' && !Array.isArray(value)) {
+        try {
+            return JSON.stringify(value);
+        } catch (e) {
+            console.warn('無法將物件轉為 JSON 字串:', e);
+            return '';
+        }
+    }
+
     if (typeof value === 'string') {
+        return value.trim();
+    }
+
+    return String(value);
+}
+
+/**
+ * 確保數組欄位始終為數組
+ */
+export function ensureArray<T>(value: any): T[] {
+    if (Array.isArray(value)) {
         return value;
     }
 
-    // 判斷是否為空物件 {}
-    if (typeof value === 'object' && Object.keys(value).length === 0) {
-        return '';
+    if (value === null || value === undefined) {
+        return [];
     }
 
-    // 其他非字串值，嘗試轉換為字串
-    try {
-        return String(value);
-    } catch (error) {
-        console.warn('無法轉換值為字串:', value);
-        return '';
-    }
-};
+    return [value] as T[];
+}
 
 /**
- * 清理醫療記錄表單中的所有字串欄位
- * 
- * @param formData 醫療記錄表單數據
- * @returns 清理後的表單數據
+ * 清理醫療記錄數據
+ * 確保所有字串欄位格式正確，轉換空物件、null 等為空字串
  */
-export const cleanMedicalRecordData = (formData: any): any => {
-    const cleanedData = { ...formData };
-
-    // 清理主要文本欄位
-    if (cleanedData.chief_complaint !== undefined) {
-        cleanedData.chief_complaint = cleanStringField(cleanedData.chief_complaint);
+export function cleanMedicalRecordData(data: any): any {
+    if (!data) {
+        return {};
     }
 
-    if (cleanedData.present_illness !== undefined) {
-        cleanedData.present_illness = cleanStringField(cleanedData.present_illness);
+    const result: any = { ...data };
+
+    // 清理主要字串欄位
+    const stringFields = [
+        'chief_complaint', 'present_illness', 'observation',
+        'left_pulse', 'right_pulse', 'tongue_quality',
+        'tongue_shape', 'tongue_color', 'tongue_coating',
+        'prescription_instructions'
+    ];
+
+    stringFields.forEach(field => {
+        if (field in result) {
+            result[field] = cleanStringField(result[field]);
+        }
+    });
+
+    // 特殊處理 observation 欄位
+    if ('observation' in result) {
+        if (typeof result.observation === 'object' && result.observation !== null) {
+            try {
+                result.observation = JSON.stringify(result.observation);
+            } catch (e) {
+                console.warn('無法將 observation 物件轉為 JSON 字串:', e);
+                result.observation = '';
+            }
+        } else if (result.observation === null || result.observation === undefined) {
+            result.observation = '';
+        }
     }
 
-    if (cleanedData.observation !== undefined) {
-        cleanedData.observation = cleanStringField(cleanedData.observation);
+    // 確保診斷相關欄位為陣列
+    if (result.diagnosis_structured) {
+        if (result.diagnosis_structured.modernDiseases === null || result.diagnosis_structured.modernDiseases === undefined) {
+            result.diagnosis_structured.modernDiseases = [];
+        } else {
+            result.diagnosis_structured.modernDiseases = ensureArray(result.diagnosis_structured.modernDiseases);
+        }
+
+        if (result.diagnosis_structured.cmSyndromes === null || result.diagnosis_structured.cmSyndromes === undefined) {
+            result.diagnosis_structured.cmSyndromes = [];
+        } else {
+            result.diagnosis_structured.cmSyndromes = ensureArray(result.diagnosis_structured.cmSyndromes);
+        }
+
+        if (result.diagnosis_structured.cmPrinciple === null || result.diagnosis_structured.cmPrinciple === undefined) {
+            result.diagnosis_structured.cmPrinciple = [];
+        } else {
+            result.diagnosis_structured.cmPrinciple = ensureArray(result.diagnosis_structured.cmPrinciple);
+        }
     }
 
-    // 清理脈診與舌診欄位
-    if (cleanedData.left_pulse !== undefined) {
-        cleanedData.left_pulse = cleanStringField(cleanedData.left_pulse);
+    // 直接處理診斷欄位
+    if (result.diagnosis && (typeof result.diagnosis === 'object' && result.diagnosis !== null)) {
+        if (result.diagnosis.modern_diseases === null || result.diagnosis.modern_diseases === undefined) {
+            result.diagnosis.modern_diseases = [];
+        } else {
+            result.diagnosis.modern_diseases = ensureArray(result.diagnosis.modern_diseases);
+        }
+
+        if (result.diagnosis.cm_syndromes === null || result.diagnosis.cm_syndromes === undefined) {
+            result.diagnosis.cm_syndromes = [];
+        } else {
+            result.diagnosis.cm_syndromes = ensureArray(result.diagnosis.cm_syndromes);
+        }
     }
 
-    if (cleanedData.right_pulse !== undefined) {
-        cleanedData.right_pulse = cleanStringField(cleanedData.right_pulse);
+    return result;
+}
+
+/**
+ * 清理患者數據
+ * 確保所有字串欄位格式正確，轉換空物件、null 等為空字串
+ */
+export function cleanPatientData(data: any): any {
+    if (!data) {
+        return {};
     }
 
-    if (cleanedData.tongue_quality !== undefined) {
-        cleanedData.tongue_quality = cleanStringField(cleanedData.tongue_quality);
-    }
+    const result: any = { ...data };
 
-    if (cleanedData.tongue_shape !== undefined) {
-        cleanedData.tongue_shape = cleanStringField(cleanedData.tongue_shape);
-    }
+    // 確保陣列字段始終為陣列
+    const arrayFields = ['basic_diseases', 'drug_allergies', 'food_allergies'];
+    arrayFields.forEach(field => {
+        if (field in result) {
+            result[field] = ensureArray(result[field]);
+        }
+    });
 
-    if (cleanedData.tongue_color !== undefined) {
-        cleanedData.tongue_color = cleanStringField(cleanedData.tongue_color);
-    }
+    // 清理字串欄位
+    const stringFields = [
+        'chinese_name', 'english_name', 'id_number', 'phone_number',
+        'email', 'gender', 'note', 'region', 'district', 'sub_district',
+        'chief_complaint', 'special_note'
+    ];
 
-    if (cleanedData.tongue_coating !== undefined) {
-        cleanedData.tongue_coating = cleanStringField(cleanedData.tongue_coating);
-    }
+    stringFields.forEach(field => {
+        if (field in result) {
+            result[field] = cleanStringField(result[field]);
+        }
+    });
 
-    return cleanedData;
-}; 
+    return result;
+} 

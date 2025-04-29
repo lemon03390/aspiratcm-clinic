@@ -64,25 +64,63 @@ const apiClientWithRetry = async (
       const err = error as AxiosError;
       lastError = err;
 
-      // 如果錯誤是客戶端錯誤（4xx），直接拋出錯誤
+      // 對於404錯誤，直接返回一個友好的錯誤，不進行重試
+      if (err.response?.status === 404) {
+        console.log(`資源不存在: ${endpoint}`, err.response?.data);
+        const errorDetail = err.response?.data as any;
+        const errorMessage = errorDetail?.detail || '資源不存在';
+        throw new Error(`找不到資源: ${errorMessage}`);
+      }
+
+      // 對於400錯誤（錯誤請求），直接拋出錯誤，不進行重試
+      if (err.response?.status === 400) {
+        console.log(`請求參數錯誤: ${endpoint}`, err.response?.data);
+        const errorDetail = err.response?.data as any;
+        const errorMessage = errorDetail?.detail || '請求參數錯誤';
+        throw new Error(`請求參數錯誤: ${errorMessage}`);
+      }
+
+      // 對於401錯誤（未授權），可能需要重新登錄
+      if (err.response?.status === 401) {
+        console.log(`未授權訪問: ${endpoint}`);
+        throw new Error('您的登錄狀態已過期，請重新登錄');
+      }
+
+      // 如果錯誤是客戶端錯誤（4xx）且不是上述處理的錯誤，直接拋出
       if (
         err.response?.status &&
         err.response.status >= 400 &&
         err.response.status < 500
       ) {
-        throw err;
+        console.log(`客戶端錯誤: ${endpoint}`, err.response?.data);
+        const errorDetail = err.response?.data as any;
+        const errorMessage = errorDetail?.detail || '請求出現錯誤';
+        throw new Error(`請求錯誤: ${errorMessage}`);
       }
 
       retryCount++;
-      console.log(`API請求失敗，正在重試 (${retryCount}/${retries})...`, err);
+      console.log(`API請求失敗 (${retryCount}/${retries})...`, err);
+      console.log(`請求URL: ${endpoint}`);
+      console.log(`錯誤詳情:`, err.response?.data || err.message);
 
       // 等待一段時間再重試
       await new Promise((resolve) => setTimeout(resolve, delay * Math.pow(2, retryCount - 1)));
     }
   }
 
-  // 重試用盡後，拋出最後一個錯誤
-  throw lastError;
+  // 重試用盡後，提供更友好的錯誤訊息
+  let errorMessage = '系統暫時無法連接，請稍後再試';
+
+  if (lastError?.response?.status === 500) {
+    errorMessage = '系統內部錯誤，請聯繫技術支持';
+  } else if (lastError?.code === 'ECONNABORTED') {
+    errorMessage = '連接超時，請檢查網絡連接';
+  } else if (lastError?.message) {
+    errorMessage = `請求失敗: ${lastError.message}`;
+  }
+
+  console.error(`重試 ${retries} 次後仍然失敗:`, endpoint, lastError);
+  throw new Error(errorMessage);
 };
 
 // 參考資料API
@@ -260,24 +298,32 @@ export const medicalRecordApi = {
 
 // 病人API
 export const patientApi = {
-  // 獲取患者詳情（通過掛號編號）
-  getPatientByRegistrationNumber: async (registrationNumber: string) => {
-    try {
-      console.log('正在獲取患者資料，掛號編號:', registrationNumber);
-      return await apiClientWithRetry('get', `/patient_registration/by-registration-number/${registrationNumber}/`);
-    } catch (error) {
-      console.error(`獲取患者資料失敗，掛號編號: ${registrationNumber}:`, error);
-      throw error;
-    }
-  },
-
   // 獲取患者詳情（通過ID）
   getPatientById: async (patientId: number) => {
     try {
       console.log('正在獲取患者資料，患者ID:', patientId);
-      return await apiClientWithRetry('get', `/patient_registration/${patientId}/`);
+
+      if (!patientId) {
+        throw new Error('缺少有效的患者ID');
+      }
+
+      const response = await apiClientWithRetry('get', `/patients/${patientId}`);
+
+      // 增強的資料清理，確保關鍵欄位格式正確
+      const cleanedData = defensiveDataCleaning(response);
+      console.log('清理後的患者資料:', cleanedData);
+      return cleanedData;
     } catch (error) {
       console.error(`獲取患者資料失敗，患者ID: ${patientId}:`, error);
+
+      // 提供更詳細的錯誤信息
+      if (error.response) {
+        console.error(`API響應狀態: ${error.response.status}`);
+        console.error(`請求URL: ${error.config?.url}`);
+        console.error(`回應數據: `, error.response.data);
+        throw new Error(`獲取患者資料失敗(${error.response.status}): 可能是程式邏輯錯誤，請通知技術人員`);
+      }
+
       throw error;
     }
   },
@@ -288,9 +334,43 @@ export const patientApi = {
       console.log('正在獲取患者資料，電話號碼:', phoneNumber);
       // 格式化電話號碼，移除空格和特殊字符
       const formattedPhone = phoneNumber.replace(/[\s\-\(\)]/g, '');
-      return await apiClientWithRetry('get', `/patient_registration/by-phone-number/${formattedPhone}/`);
+
+      // 嘗試使用新 API 端點格式
+      try {
+        console.log('嘗試使用查詢參數格式 API 端點');
+        const response = await axios.get(getBackendUrl(`/patients/by-phone-number?phone=${formattedPhone}`), {
+          timeout: 5000
+        });
+        console.log('成功獲取患者資料（查詢參數格式）');
+
+        // 增強的資料清理，確保關鍵欄位格式正確
+        const cleanedData = defensiveDataCleaning(response.data);
+        console.log('清理後的患者資料:', cleanedData);
+        return cleanedData;
+      } catch (fallbackError: any) {
+        // 記錄新 API 嘗試的錯誤
+        console.warn('使用新 API 端點失敗，嘗試舊式端點格式:', fallbackError?.message);
+
+        // 嘗試使用原始 API 端點格式 (路徑參數) - 僅作為臨時後備方案
+        console.log('嘗試使用原始路徑參數格式 API 端點（即將淘汰）');
+        const response = await apiClientWithRetry('get', `/patient_registration/by-phone-number/${formattedPhone}/`);
+
+        // 增強的資料清理，確保關鍵欄位格式正確
+        const cleanedData = defensiveDataCleaning(response);
+        console.log('清理後的患者資料:', cleanedData);
+        return cleanedData;
+      }
     } catch (error) {
       console.error(`獲取患者資料失敗，電話號碼: ${phoneNumber}:`, error);
+
+      // 提供更詳細的錯誤信息
+      if (error.response) {
+        console.error(`API響應狀態: ${error.response.status}`);
+        console.error(`請求URL: ${error.config?.url}`);
+        console.error(`回應數據: `, error.response.data);
+        throw new Error(`獲取患者資料失敗(${error.response.status}): 可能是程式邏輯錯誤，請通知技術人員`);
+      }
+
       throw error;
     }
   },
@@ -299,9 +379,18 @@ export const patientApi = {
   updatePatient: async (patientId: number, updateData: any) => {
     try {
       console.log(`正在更新患者資料，患者ID: ${patientId}:`, updateData);
-      return await apiClientWithRetry('patch', `/patient_registration/${patientId}`, updateData);
+      return await apiClientWithRetry('patch', `/patients/${patientId}`, updateData);
     } catch (error) {
       console.error(`更新患者資料失敗，患者ID: ${patientId}:`, error);
+
+      // 提供更詳細的錯誤信息
+      if (error.response) {
+        console.error(`API響應狀態: ${error.response.status}`);
+        console.error(`請求URL: ${error.config?.url}`);
+        console.error(`回應數據: `, error.response.data);
+        throw new Error(`更新患者資料失敗(${error.response.status}): 可能是程式邏輯錯誤，請通知技術人員`);
+      }
+
       throw error;
     }
   },
@@ -313,7 +402,7 @@ export const patientApi = {
     special_note: string;
   }) => {
     try {
-      const response = await fetch(`${getBackendUrl(`/patient_registration/${patientId}`)}`, {
+      const response = await fetch(`${getBackendUrl(`/patients/${patientId}`)}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -322,7 +411,9 @@ export const patientApi = {
       });
 
       if (!response.ok) {
-        throw new Error(`更新患者標記失敗: ${response.statusText}`);
+        console.error(`API響應狀態: ${response.status}`);
+        console.error(`請求URL: ${getBackendUrl(`/patients/${patientId}`)}`);
+        throw new Error(`更新患者標記失敗(${response.status}): 可能是程式邏輯錯誤，請通知技術人員`);
       }
 
       return await response.json();
@@ -332,6 +423,94 @@ export const patientApi = {
     }
   },
 };
+
+// 增強型資料清理函數，提供更強的容錯性
+function defensiveDataCleaning(data: any): any {
+  if (!data) {
+    return {};
+  }
+
+  const cleanedData = { ...data };
+
+  // 確保 basic_diseases, drug_allergies, food_allergies 始終為陣列
+  ['basic_diseases', 'drug_allergies', 'food_allergies'].forEach(field => {
+    if (!(field in cleanedData) || cleanedData[field] === null || cleanedData[field] === undefined) {
+      cleanedData[field] = [];
+    } else if (!Array.isArray(cleanedData[field])) {
+      cleanedData[field] = [cleanedData[field]];
+    }
+  });
+
+  // 清理字符串欄位
+  ['note', 'chief_complaint', 'special_note'].forEach(field => {
+    if (field in cleanedData && (cleanedData[field] === null || cleanedData[field] === undefined)) {
+      cleanedData[field] = '';
+    }
+  });
+
+  // 特殊處理 observation 欄位
+  if ('observation' in cleanedData) {
+    if (cleanedData.observation === null ||
+      cleanedData.observation === undefined ||
+      (typeof cleanedData.observation === 'object' && Object.keys(cleanedData.observation).length === 0)) {
+      cleanedData.observation = '';
+    } else if (typeof cleanedData.observation === 'object') {
+      try {
+        cleanedData.observation = JSON.stringify(cleanedData.observation);
+      } catch (error) {
+        console.warn('將 observation 對象轉換為字符串時出錯:', error);
+        cleanedData.observation = '';
+      }
+    }
+  }
+
+  // 處理醫療記錄中的診斷欄位
+  if (cleanedData.medical_records && Array.isArray(cleanedData.medical_records)) {
+    cleanedData.medical_records = cleanedData.medical_records.map((record: any) => {
+      if (!record) {
+        return record;
+      }
+
+      // 清理 observation
+      if ('observation' in record) {
+        if (record.observation === null ||
+          record.observation === undefined ||
+          (typeof record.observation === 'object' && Object.keys(record.observation).length === 0)) {
+          record.observation = '';
+        } else if (typeof record.observation === 'object') {
+          try {
+            record.observation = JSON.stringify(record.observation);
+          } catch (error) {
+            console.warn('將醫療記錄中的 observation 對象轉換為字符串時出錯:', error);
+            record.observation = '';
+          }
+        }
+      }
+
+      // 處理診斷欄位
+      if (record.diagnosis) {
+        if (!record.diagnosis.modern_diseases || record.diagnosis.modern_diseases === null) {
+          record.diagnosis.modern_diseases = [];
+        }
+        if (!record.diagnosis.cm_syndromes || record.diagnosis.cm_syndromes === null) {
+          record.diagnosis.cm_syndromes = [];
+        }
+      }
+
+      return record;
+    });
+  }
+
+  // 處理特殊標記欄位
+  if ('is_troublesome' in cleanedData && cleanedData.is_troublesome === null) {
+    cleanedData.is_troublesome = 0;
+  }
+  if ('is_contagious' in cleanedData && cleanedData.is_contagious === null) {
+    cleanedData.is_contagious = 0;
+  }
+
+  return cleanedData;
+}
 
 // 預約API
 export const appointmentApi = {
@@ -355,6 +534,15 @@ export const appointmentApi = {
       return response;
     } catch (error) {
       console.error('獲取候診名單失敗:', error);
+
+      // 加強錯誤處理
+      if (error.response) {
+        console.error(`API響應狀態: ${error.response.status}`);
+        console.error(`請求URL: ${error.config?.url}`);
+        console.error(`回應數據: `, error.response.data);
+      }
+
+      // 返回空陣列避免UI崩潰
       return [];
     }
   },
@@ -367,6 +555,15 @@ export const appointmentApi = {
       return await apiClientWithRetry('delete', endpoint);
     } catch (error) {
       console.error(`從候診清單中移除患者失敗，ID: ${patientId}:`, error);
+
+      // 加強錯誤處理
+      if (error.response) {
+        console.error(`API響應狀態: ${error.response.status}`);
+        console.error(`請求URL: ${error.config?.url}`);
+        console.error(`回應數據: `, error.response.data);
+        throw new Error(`從候診清單中移除患者失敗(${error.response.status}): 可能是程式邏輯錯誤，請通知技術人員`);
+      }
+
       throw error;
     }
   },
@@ -378,6 +575,15 @@ export const appointmentApi = {
       return await apiClientWithRetry('patch', `/appointments/${appointmentId}/status`, { status });
     } catch (error) {
       console.error(`更新預約狀態失敗：ID=${appointmentId}`, error);
+
+      // 加強錯誤處理
+      if (error.response) {
+        console.error(`API響應狀態: ${error.response.status}`);
+        console.error(`請求URL: ${error.config?.url}`);
+        console.error(`回應數據: `, error.response.data);
+        throw new Error(`更新預約狀態失敗(${error.response.status}): 可能是程式邏輯錯誤，請通知技術人員`);
+      }
+
       throw error;
     }
   },
@@ -389,6 +595,15 @@ export const appointmentApi = {
       return await apiClientWithRetry('post', '/appointments', appointmentData);
     } catch (error) {
       console.error('創建覆診預約失敗:', error);
+
+      // 加強錯誤處理
+      if (error.response) {
+        console.error(`API響應狀態: ${error.response.status}`);
+        console.error(`請求URL: ${error.config?.url}`);
+        console.error(`回應數據: `, error.response.data);
+        throw new Error(`創建覆診預約失敗(${error.response.status}): 可能是程式邏輯錯誤，請通知技術人員`);
+      }
+
       throw error;
     }
   },

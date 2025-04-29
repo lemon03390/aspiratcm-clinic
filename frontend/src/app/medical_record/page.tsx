@@ -225,29 +225,17 @@ export default function MedicalRecordPage() {
           setWaitingPatients(response);
           setErrorMessage(null);
         }
-
-        // 設置定時刷新
-        const interval = setInterval(fetchWaitingList, 300000); // 每5分鐘刷新一次
-        return () => clearInterval(interval);
-
       } catch (error) {
         console.error('獲取候診名單失敗:', error);
         setErrorMessage('無法連接掛號系統，請確認網絡連接或聯繫技術支持');
-
-        // 在開發環境中使用模擬數據僅供測試
-        if (process.env.NODE_ENV === 'development') {
-          console.log('使用臨時模擬數據（僅用於開發環境）');
-          const mockData = [
-            { id: '1', name: '張三', isFirstVisit: false, waitingSince: '09:30', registration_number: 'PT00001', patient_id: 1, is_contagious: 0, is_troublesome: 0 },
-            { id: '2', name: '李四', isFirstVisit: true, waitingSince: '10:15', registration_number: 'PT00002', patient_id: 2, is_contagious: 0, is_troublesome: 0 },
-            { id: '3', name: '王五', isFirstVisit: false, waitingSince: '10:45', registration_number: 'PT00003', patient_id: 3, is_contagious: 0, is_troublesome: 0 }
-          ];
-
-          setWaitingPatients(mockData);
-        }
+        setWaitingPatients([]);
       } finally {
         setIsLoading(false);
       }
+
+      // 設置定時刷新
+      const interval = setInterval(fetchWaitingList, 300000); // 每5分鐘刷新一次
+      return () => clearInterval(interval);
     };
 
     fetchWaitingList();
@@ -328,18 +316,16 @@ export default function MedicalRecordPage() {
 
       const now = new Date();
       // 檢查草稿是否在24小時內
-      if ((now.getTime() - timestamp.getTime()) < 24 * 60 * 60 * 1000) {
-        if (window.confirm(`發現${formatDate(timestamp)}的未完成記錄，是否恢復？`)) {
-          console.log('載入草稿資料', parsedData.formData);
-          setFormData(parsedData.formData);
+      if ((now.getTime() - timestamp.getTime()) < 24 * 60 * 60 * 1000 && window.confirm(`發現${formatDate(timestamp)}的未完成記錄，是否恢復？`)) {
+        console.log('載入草稿資料', parsedData.formData);
+        setFormData(parsedData.formData);
 
-          // 如果草稿中有診斷資料，也還原原始診斷資料
-          if (parsedData.rawDiagnosisData) {
-            setRawDiagnosisData(parsedData.rawDiagnosisData);
-          }
-
-          return true;
+        // 如果草稿中有診斷資料，也還原原始診斷資料
+        if (parsedData.rawDiagnosisData) {
+          setRawDiagnosisData(parsedData.rawDiagnosisData);
         }
+
+        return true;
       }
 
       // 用戶拒絕載入或草稿過期
@@ -352,42 +338,44 @@ export default function MedicalRecordPage() {
   };
 
   // 根據候診名單中的患者ID獲取患者詳細資料
-  const fetchPatientDetails = async (registrationNumber: string) => {
+  const fetchPatientDetails = async (patientId: number) => {
     try {
       setIsLoading(true);
       setErrorMessage(null);
 
-      // 從患者登記系統獲取患者詳細資料
-      console.log('獲取患者詳細資料，掛號編號:', registrationNumber);
+      // 從候診名單中找到對應患者
+      const selectedPatient = waitingPatients.find(p => p.patient_id === patientId);
+      if (!selectedPatient) {
+        throw new Error(`候診名單中找不到對應患者，ID: ${patientId}`);
+      }
 
-      // 實際API調用
-      const patientData = await patientApi.getPatientByRegistrationNumber(registrationNumber);
-      console.log('獲取到患者資料:', patientData);
+      console.log('獲取患者詳細資料，患者ID:', patientId);
 
-      // 查找有無該患者對應的特殊標記
-      const selectedPatient = waitingPatients.find(p => p.registration_number === registrationNumber);
+      // 直接使用 API 通過 patient_id 獲取詳細資料
+      try {
+        const patientData = await patientApi.getPatientById(patientId);
+        console.log('獲取到患者資料:', patientData);
 
-      // 設置特殊標記
-      const isContagious = selectedPatient?.is_contagious === 1;
-      const isTroublesome = selectedPatient?.is_troublesome === 1;
-      const specialNote = selectedPatient?.special_note || patientData.special_note || '';
+        // 設置特殊標記
+        const isContagious = selectedPatient.is_contagious === 1;
+        const isTroublesome = selectedPatient.is_troublesome === 1;
+        const specialNote = selectedPatient.special_note || patientData.special_note || '';
 
-      setCurrentPatient({
-        ...patientData,
-        // 添加特殊標記標志
-        isContagious,
-        isTroublesome,
-        isFirstVisit: selectedPatient?.isFirstVisit || false,
-        special_note: specialNote
-      });
+        setCurrentPatient({
+          ...patientData,
+          // 添加特殊標記標志
+          isContagious,
+          isTroublesome,
+          isFirstVisit: selectedPatient.isFirstVisit || false,
+          special_note: specialNote
+        });
 
-      // 設置是否顯示女性專用欄位
-      setShowFemaleFields(patientData.gender === '女');
+        // 設置是否顯示女性專用欄位
+        setShowFemaleFields(patientData.gender === '女');
 
-      // 獲取過往病歷記錄
-      if (patientData.id) {
+        // 獲取過往病歷記錄
         try {
-          const pastRecordsData = await medicalRecordApi.getPatientRecords(patientData.id);
+          const pastRecordsData = await medicalRecordApi.getPatientRecords(patientId);
           console.log('獲取到過往病歷:', pastRecordsData);
 
           // 轉換API響應格式為組件所需格式
@@ -403,53 +391,37 @@ export default function MedicalRecordPage() {
           console.error('獲取過往病歷失敗:', recordError);
           setPastRecords([]);
         }
-      }
 
-      // 嘗試載入草稿
-      if (!loadDraft(patientData.id)) {
-        // 如果沒有草稿或用戶拒絕恢復，則使用默認值
-        resetFormData(patientData);
+        // 嘗試載入草稿
+        if (!loadDraft(patientId)) {
+          // 如果沒有草稿或用戶拒絕恢復，則使用默認值
+          resetFormData(patientData);
+        }
+      } catch (patientError: any) {
+        console.error('獲取患者詳細資料API錯誤:', patientError);
+
+        // 提供詳細的錯誤日誌
+        if (patientError.response) {
+          console.error(`API響應狀態: ${patientError.response.status}`);
+          console.error(`請求URL: ${patientError.config?.url}`);
+          console.error(`回應資料: `, patientError.response.data);
+        }
+
+        // 友善提示
+        setErrorMessage(
+          `無法載入患者詳細資料 (ID: ${patientId})：${patientError.message || '系統錯誤'}
+          可能是程式邏輯錯誤，請聯繫技術人員並提供上述錯誤訊息。`
+        );
+
+        setCurrentPatient(null);
+        setPastRecords([]);
       }
 
     } catch (error) {
-      console.error('獲取患者詳細資料失敗:', error);
-      setErrorMessage('無法載入患者詳細資料');
+      console.error('獲取患者詳細資料邏輯錯誤:', error);
+      setErrorMessage('無法載入患者詳細資料，請刷新頁面或聯繫技術支持');
       setCurrentPatient(null);
       setPastRecords([]);
-
-      // 如果 API 調用失敗，使用臨時模擬數據（僅用於開發）
-      if (process.env.NODE_ENV === 'development') {
-        const mockPatientData = {
-          id: 1,
-          chinese_name: '張三',
-          gender: '男',
-          birth_date: '1980-01-01',
-          phone_number: '0912-345-678',
-          region: '台北市',
-          doctor_name: '李醫師',
-          doctor_id: 1,
-          basic_diseases: ['高血壓', '糖尿病'],
-          drug_allergies: ['青黴素'],
-          food_allergies: [],
-          note: '需要定期追蹤血壓',
-          chief_complaint: '經常頭痛，伴隨頸部不適',
-          registration_number: registrationNumber,
-          isContagious: false,
-          isTroublesome: false,
-          isFirstVisit: true
-        };
-
-        setCurrentPatient(mockPatientData);
-        setShowFemaleFields(mockPatientData.gender === '女');
-
-        const mockPastRecords = [
-          { id: '101', date: '2023-06-15', diagnosis: '頭痛、頸痛', prescription: '川芎10g, 白芍10g, 天麻15g' },
-          { id: '102', date: '2023-05-22', diagnosis: '胃脘痛', prescription: '陳皮10g, 炙甘草6g, 白芍12g' },
-          { id: '103', date: '2023-04-10', diagnosis: '腰痛', prescription: '杜仲12g, 牛膝10g, 續斷15g' }
-        ];
-
-        setPastRecords(mockPastRecords);
-      }
     } finally {
       setIsLoading(false);
     }
@@ -727,9 +699,12 @@ export default function MedicalRecordPage() {
 
     // 從候診名單中找到對應的患者
     const selectedPatient = waitingPatients.find(p => p.id === patientId);
-    if (selectedPatient?.registration_number) {
-      // 同時傳遞特殊標記
-      fetchPatientDetails(selectedPatient.registration_number);
+    if (selectedPatient) {
+      // 直接使用患者ID查詢詳細資料，不再使用掛號編號
+      fetchPatientDetails(selectedPatient.patient_id);
+    } else {
+      console.error(`無法在候診名單中找到患者 ID: ${patientId}`);
+      setErrorMessage('無法找到選定的患者，請刷新頁面重試');
     }
   };
 
@@ -843,6 +818,16 @@ export default function MedicalRecordPage() {
         {errorMessage && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4" role="alert">
             <p>{errorMessage}</p>
+            {!waitingPatients.length && (
+              <div className="mt-2">
+                <button
+                  onClick={handleRefreshWaitingList}
+                  className="bg-red-200 hover:bg-red-300 text-red-800 px-3 py-1 rounded text-sm"
+                >
+                  重新載入候診清單
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -888,10 +873,12 @@ export default function MedicalRecordPage() {
                       <p className="text-gray-700"><span className="font-medium">姓名:</span> {currentPatient?.chinese_name}</p>
                       <p className="text-gray-700"><span className="font-medium">年齡:</span> {calculateAge(currentPatient?.birth_date)}</p>
                       <p className="text-gray-700"><span className="font-medium">性別:</span> {currentPatient?.gender}</p>
+                      <p className="text-gray-700"><span className="font-medium">電話:</span> {currentPatient?.phone_number}</p>
                     </div>
                     <div>
-                      <p className="text-gray-700"><span className="font-medium">電話:</span> {currentPatient?.phone_number}</p>
+                      <p className="text-gray-700"><span className="font-medium">病歷號:</span> {currentPatient?.id}</p>
                       <p className="text-gray-700"><span className="font-medium">過敏藥物:</span> {currentPatient?.drug_allergies?.join(', ')}</p>
+                      <p className="text-gray-700"><span className="font-medium">既往疾病:</span> {currentPatient?.basic_diseases?.join(', ')}</p>
                     </div>
                   </div>
 
@@ -983,7 +970,21 @@ export default function MedicalRecordPage() {
               <div className="bg-white p-6 rounded-md shadow text-center">
                 <p className="text-gray-500 mb-4">請從候診名單中選擇患者</p>
                 {waitingPatients.length === 0 && !isLoading && (
-                  <p className="text-sm text-gray-400">候診名單為空</p>
+                  <div>
+                    <p className="text-sm text-gray-400 mb-3">候診名單為空</p>
+                    <button
+                      onClick={handleRefreshWaitingList}
+                      className="bg-blue-100 hover:bg-blue-200 text-blue-700 px-4 py-2 rounded-md text-sm"
+                    >
+                      重新載入候診清單
+                    </button>
+                  </div>
+                )}
+                {isLoading && (
+                  <div className="flex justify-center items-center mt-4">
+                    <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="ml-2 text-blue-600">載入中...</span>
+                  </div>
                 )}
               </div>
             )}
