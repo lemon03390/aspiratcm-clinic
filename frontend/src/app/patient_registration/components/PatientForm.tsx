@@ -423,10 +423,14 @@ const PatientForm: React.FC = () => {
       } else {
         // 否則視為身份證號碼
         const response = await checkIdNumber(searchQuery);
-        if (response.exists && response.patient) {
-          patient = response.patient;
+        if (response) {
+          if (response.exists && response.patient) {
+            patient = response.patient;
+          } else {
+            throw new Error('找不到此身份證對應的患者記錄');
+          }
         } else {
-          throw new Error('找不到此身份證對應的患者記錄');
+          throw new Error('查詢身份證號碼失敗，請稍後再試');
         }
       }
 

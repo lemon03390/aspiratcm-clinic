@@ -211,7 +211,13 @@ export const medicalRecordApi = {
   getRecordById: async (recordId: string) => {
     try {
       console.log('正在獲取病歷詳情，記錄ID:', recordId);
-      return await apiClientWithRetry('get', `/medical-records/${recordId}`);
+      const response = await apiClientWithRetry('get', `/medical-records/${recordId}`);
+
+      // 增強數據處理：確保各欄位有正確格式
+      const enhancedRecord = defensiveRecordCleaning(response);
+      console.log('經過強化處理的病歷記錄:', enhancedRecord);
+
+      return enhancedRecord;
     } catch (error) {
       console.error(`獲取病歷詳情失敗，記錄ID: ${recordId}:`, error);
       throw error;
@@ -230,20 +236,45 @@ export const medicalRecordApi = {
       // 轉換診斷資料為後端所需的格式
       let transformedData = { ...cleanedData };
 
-      // 如果有診斷結構資料，轉換為後端要求格式
-      if (cleanedData.diagnosis_structured) {
-        const diagnosisData = cleanedData.diagnosis_structured;
+      // 處理診斷資料，確保總是有有效的結構
+      if (cleanedData.diagnosis) {
+        const diagnosisData = cleanedData.diagnosis_structured || cleanedData.diagnosis;
 
-        transformedData.diagnosis = {
-          modern_diseases: (diagnosisData.modernDiseases || []).map(d => d.code || d.name || ''),
-          cm_syndromes: (diagnosisData.cmSyndromes || []).map(d => d.code || d.name || ''),
-          cm_principle: diagnosisData.cmPrinciple?.[0]?.code || diagnosisData.cmPrinciple?.[0]?.name || undefined
-        };
+        if (diagnosisData) {
+          transformedData.diagnosis = {
+            modern_diseases: (diagnosisData.modernDiseases || diagnosisData.modern_diseases || [])
+              .filter(d => d && (typeof d === 'string' ? d.trim() !== '' : d.code || d.name))
+              .map(d => {
+                if (typeof d === 'string') {
+                  return d;
+                }
+                return d.code || d.name || '';
+              }),
+            cm_syndromes: (diagnosisData.cmSyndromes || diagnosisData.cm_syndromes || [])
+              .filter(d => d && (typeof d === 'string' ? d.trim() !== '' : d.code || d.name))
+              .map(d => {
+                if (typeof d === 'string') {
+                  return d;
+                }
+                return d.code || d.name || '';
+              }),
+            cm_principle: diagnosisData.cmPrinciple?.[0]?.code ||
+              diagnosisData.cmPrinciple?.[0]?.name ||
+              diagnosisData.cm_principle ||
+              ''
+          };
+        } else {
+          transformedData.diagnosis = {
+            modern_diseases: [],
+            cm_syndromes: [],
+            cm_principle: ''
+          };
+        }
 
         // 移除原始結構化診斷數據
         delete transformedData.diagnosis_structured;
-      } else if (!transformedData.diagnosis) {
-        // 如果沒有診斷資料，創建空的診斷結構
+      } else {
+        // 即使沒有診斷數據，也確保診斷結構存在
         transformedData.diagnosis = {
           modern_diseases: [],
           cm_syndromes: [],
@@ -252,33 +283,69 @@ export const medicalRecordApi = {
       }
 
       // 轉換處方藥材為後端所需格式
-      if (cleanedData.prescription && Array.isArray(cleanedData.prescription)) {
-        transformedData.prescription = {
-          instructions: cleanStringField(cleanedData.prescription_instructions || ""),
-          structured_instructions: cleanedData.prescription_structured_instructions || {
-            total_days: 7,
-            times_per_day: 2,
-            timing: '早晚服'
-          },
-          herbs: cleanedData.prescription.map((herb, index) => ({
-            herb_name: herb.name || '',
-            amount: herb.amount || herb.powder_amount || '0',
-            unit: herb.unit || "g",
-            sequence: index,
-            source: "manual",
-            structured_data: {
-              price_per_gram: herb.price_per_gram || 0,
-              total_price: herb.total_price || 0,
-              brand: herb.brand || '',
-              is_compound: herb.is_compound || false,
-              code: herb.code || ''
-            }
-          }))
-        };
-      }
-
-      // 確保將藥物從陣列轉換為物件
-      if (!transformedData.prescription) {
+      if (cleanedData.prescription) {
+        // 處理處方可能直接作為陣列傳入的情況
+        if (Array.isArray(cleanedData.prescription)) {
+          transformedData.prescription = {
+            instructions: cleanStringField(cleanedData.prescription_instructions || ""),
+            structured_instructions: cleanedData.prescription_structured_instructions || {
+              total_days: 7,
+              times_per_day: 2,
+              timing: '早晚服'
+            },
+            herbs: cleanedData.prescription.map((herb, index) => ({
+              herb_name: herb.name || '',
+              amount: herb.amount || herb.powder_amount || '0',
+              unit: herb.unit || "g",
+              sequence: index,
+              source: "manual",
+              structured_data: {
+                price_per_gram: herb.price_per_gram || 0,
+                total_price: herb.total_price || 0,
+                brand: herb.brand || '',
+                is_compound: herb.is_compound || false,
+                code: herb.code || ''
+              }
+            }))
+          };
+        } else if (cleanedData.prescription.herbs && Array.isArray(cleanedData.prescription.herbs)) {
+          // 處方已經是正確格式：包含herbs陣列的對象
+          transformedData.prescription = {
+            instructions: cleanStringField(cleanedData.prescription.instructions || ""),
+            structured_instructions: cleanedData.prescription.structured_instructions || {
+              total_days: 7,
+              times_per_day: 2,
+              timing: '早晚服'
+            },
+            herbs: cleanedData.prescription.herbs.map((herb, index) => ({
+              herb_name: herb.herb_name || herb.name || '',
+              amount: herb.amount || '0',
+              unit: herb.unit || "g",
+              sequence: index,
+              source: herb.source || "manual",
+              structured_data: herb.structured_data || {
+                price_per_gram: herb.price_per_gram || 0,
+                total_price: herb.total_price || 0,
+                brand: herb.brand || '',
+                is_compound: herb.is_compound || false,
+                code: herb.code || ''
+              }
+            }))
+          };
+        } else if (typeof cleanedData.prescription === 'object') {
+          // 處方是對象但格式不完整
+          transformedData.prescription = {
+            instructions: cleanStringField(cleanedData.prescription.instructions || cleanedData.prescription_instructions || ""),
+            structured_instructions: cleanedData.prescription.structured_instructions || cleanedData.prescription_structured_instructions || {
+              total_days: 7,
+              times_per_day: 2,
+              timing: '早晚服'
+            },
+            herbs: []
+          };
+        }
+      } else {
+        // 即使沒有處方資料，也創建空的處方結構
         transformedData.prescription = {
           instructions: "",
           structured_instructions: {
@@ -288,21 +355,56 @@ export const medicalRecordApi = {
           },
           herbs: []
         };
-      } else if (transformedData.prescription && !transformedData.prescription.herbs) {
-        transformedData.prescription = {
-          instructions: transformedData.prescription_instructions || "",
-          structured_instructions: transformedData.prescription_structured_instructions || {
-            total_days: 7,
-            times_per_day: 2,
-            timing: '早晚服'
-          },
-          herbs: transformedData.prescription
+      }
+
+      // 處理治療方法資料
+      if (cleanedData.treatment) {
+        // 檢查是否直接傳入治療方法陣列
+        if (Array.isArray(cleanedData.treatment_methods) && cleanedData.treatment_methods.length > 0) {
+          transformedData.treatment = {
+            treatment_items: cleanedData.treatment_methods.map((method, index) => {
+              const parts = method.split(':', 2);
+              return {
+                method: parts[0].trim(),
+                target: parts.length > 1 ? parts[1].trim() : '',
+                description: '',
+                sequence: index
+              };
+            })
+          };
+        } else if (cleanedData.treatment.treatment_items && Array.isArray(cleanedData.treatment.treatment_items)) {
+          // 治療資料已經是正確格式
+          transformedData.treatment = cleanedData.treatment;
+        } else {
+          // 確保治療資料有正確結構
+          transformedData.treatment = {
+            treatment_items: []
+          };
+        }
+      } else if (Array.isArray(cleanedData.treatment_methods) && cleanedData.treatment_methods.length > 0) {
+        // 直接使用 treatment_methods 陣列構建治療記錄
+        transformedData.treatment = {
+          treatment_items: cleanedData.treatment_methods.map((method, index) => {
+            const parts = method.split(':', 2);
+            return {
+              method: parts[0].trim(),
+              target: parts.length > 1 ? parts[1].trim() : '',
+              description: '',
+              sequence: index
+            };
+          })
+        };
+      } else {
+        // 即使沒有治療資料，也創建空的治療結構
+        transformedData.treatment = {
+          treatment_items: []
         };
       }
 
       // 移除不需要的欄位
       delete transformedData.prescription_instructions;
       delete transformedData.prescription_structured_instructions;
+      delete transformedData.treatment_methods;
 
       console.log('轉換後準備發送的病歷資料:', transformedData);
       return await apiClientWithRetry('post', '/medical-records', transformedData);
@@ -901,6 +1003,189 @@ export const diagnosisDataApi = {
     }
   }
 };
+
+// 增強型記錄清理函數，專門用於處理病歷記錄數據
+function defensiveRecordCleaning(data: any): any {
+  if (!data) {
+    return {};
+  }
+
+  const cleanedRecord = { ...data };
+
+  // 處理主記錄欄位
+  [
+    'chief_complaint', 'present_illness', 'observation',
+    'left_pulse', 'right_pulse', 'tongue_quality',
+    'tongue_shape', 'tongue_color', 'tongue_coating'
+  ].forEach(field => {
+    if (field in cleanedRecord && (cleanedRecord[field] === null || cleanedRecord[field] === undefined)) {
+      cleanedRecord[field] = '';
+    }
+  });
+
+  // 特殊處理 observation 欄位
+  if (cleanedRecord.observation) {
+    try {
+      // 如果已經是字串但看起來像JSON
+      if (typeof cleanedRecord.observation === 'string' &&
+        (cleanedRecord.observation.startsWith('{') || cleanedRecord.observation.startsWith('['))) {
+        try {
+          // 嘗試解析JSON字串
+          const parsedObservation = JSON.parse(cleanedRecord.observation);
+          if (parsedObservation && typeof parsedObservation === 'object') {
+            // 找回客戶端格式的觀察資訊
+            const observation = {
+              ...(parsedObservation.observation || {}),
+              leftPulse: cleanedRecord.left_pulse || '',
+              rightPulse: cleanedRecord.right_pulse || '',
+              tongueQuality: cleanedRecord.tongue_quality || '',
+              tongueShape: cleanedRecord.tongue_shape || '',
+              tongueColor: cleanedRecord.tongue_color || '',
+              tongueCoating: cleanedRecord.tongue_coating || ''
+            };
+            cleanedRecord.client_observation = observation;
+          }
+        } catch (e) {
+          console.warn('解析 observation JSON 字串失敗:', e);
+        }
+      }
+    } catch (e) {
+      console.warn('處理 observation 欄位時出錯:', e);
+    }
+  }
+
+  // 處理診斷資料
+  if (cleanedRecord.diagnoses && cleanedRecord.diagnoses.length > 0) {
+    const diagnosis = cleanedRecord.diagnoses[0];
+
+    // 確保診斷欄位是陣列
+    if (!diagnosis.modern_diseases || diagnosis.modern_diseases === null) {
+      diagnosis.modern_diseases = [];
+    }
+    if (!diagnosis.cm_syndromes || diagnosis.cm_syndromes === null) {
+      diagnosis.cm_syndromes = [];
+    }
+
+    // 提取診斷資訊為客戶端使用的格式
+    cleanedRecord.client_diagnosis = {
+      modernDiseases: diagnosis.modern_diseases.map((disease: string) => ({
+        code: disease,
+        name: disease
+      })),
+      cmSyndromes: diagnosis.cm_syndromes.map((syndrome: string) => ({
+        code: syndrome,
+        name: syndrome
+      })),
+      cmPrinciple: diagnosis.cm_principle ? [{
+        code: diagnosis.cm_principle,
+        name: diagnosis.cm_principle
+      }] : []
+    };
+  } else {
+    // 如果沒有診斷資料，建立空的診斷資訊
+    cleanedRecord.diagnoses = [];
+    cleanedRecord.client_diagnosis = {
+      modernDiseases: [],
+      cmSyndromes: [],
+      cmPrinciple: []
+    };
+  }
+
+  // 處理處方資料
+  if (cleanedRecord.prescriptions && cleanedRecord.prescriptions.length > 0) {
+    const prescription = cleanedRecord.prescriptions[0];
+
+    // 確保處方指示欄位有值
+    if (!prescription.instructions) {
+      prescription.instructions = '';
+    }
+
+    // 確保結構化服法指示有值
+    if (!prescription.structured_data || !prescription.structured_data.structured_instructions) {
+      prescription.structured_data = {
+        ...prescription.structured_data,
+        structured_instructions: {
+          total_days: 7,
+          times_per_day: 2,
+          timing: '早晚服'
+        }
+      };
+    }
+
+    // 確保藥材列表是陣列
+    if (!prescription.herbs || !Array.isArray(prescription.herbs)) {
+      prescription.herbs = [];
+    }
+
+    // 提取處方資訊為客戶端使用的格式
+    cleanedRecord.client_prescription = {
+      herbs: prescription.herbs.map(herb => ({
+        id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
+        code: herb.structured_data?.code || '',
+        name: herb.herb_name || '',
+        amount: herb.amount || '',
+        powder_amount: herb.amount || '',
+        decoction_amount: herb.structured_data?.decoction_amount || '',
+        brand: herb.structured_data?.brand || '',
+        price_per_gram: herb.structured_data?.price_per_gram || 0,
+        total_price: herb.structured_data?.total_price || 0,
+        unit: herb.unit || 'g',
+        is_compound: herb.structured_data?.is_compound || false
+      })),
+      instructions: prescription.instructions || '',
+      structured_instructions: prescription.structured_data?.structured_instructions || {
+        total_days: 7,
+        times_per_day: 2,
+        timing: '早晚服'
+      }
+    };
+  } else {
+    // 如果沒有處方資料，建立空的處方資訊
+    cleanedRecord.prescriptions = [];
+    cleanedRecord.client_prescription = {
+      herbs: [],
+      instructions: '',
+      structured_instructions: {
+        total_days: 7,
+        times_per_day: 2,
+        timing: '早晚服'
+      }
+    };
+  }
+
+  // 處理治療方法資料
+  if (cleanedRecord.treatments && cleanedRecord.treatments.length > 0) {
+    const treatment = cleanedRecord.treatments[0];
+
+    // 確保治療項目是陣列
+    if (!treatment.treatment_items || !Array.isArray(treatment.treatment_items)) {
+      treatment.treatment_items = [];
+    }
+
+    // 提取治療方法為客戶端使用的格式
+    cleanedRecord.client_treatment = {
+      treatments: treatment.treatment_items.map(item => ({
+        id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
+        method: item.method || '',
+        targets: item.target ? [item.target] : []
+      }))
+    };
+
+    // 處理轉換為存儲格式的治療方法
+    cleanedRecord.treatmentMethods = treatment.treatment_items.map(item =>
+      `${item.method || ''}${item.target ? `: ${item.target}` : ''}`
+    );
+  } else {
+    // 如果沒有治療方法資料，建立空的治療資訊
+    cleanedRecord.treatments = [];
+    cleanedRecord.client_treatment = {
+      treatments: []
+    };
+    cleanedRecord.treatmentMethods = [];
+  }
+
+  return cleanedRecord;
+}
 
 // 統一導出
 export default {

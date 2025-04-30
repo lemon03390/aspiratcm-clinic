@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel
@@ -151,111 +151,69 @@ def create_medical_record(medical_record: MedicalRecordCreate, db: Session = Dep
     """創建新的醫療記錄"""
     try:
         # 清理觀察欄位，確保它始終是字串
-        if medical_record.observation is None or medical_record.observation == {} or not isinstance(medical_record.observation, str):
-            medical_record.observation = ""
-
+        clean_observation_field(medical_record)
+        
         # 創建主記錄
-        db_record = MedicalRecord(
-            patient_id=medical_record.patient_id,
-            doctor_id=medical_record.doctor_id,
-            appointment_id=medical_record.appointment_id,
-            is_first_visit=medical_record.is_first_visit,
-            chief_complaint=medical_record.chief_complaint,
-            present_illness=medical_record.present_illness,
-            observation=medical_record.observation,
-            left_pulse=medical_record.left_pulse,
-            right_pulse=medical_record.right_pulse,
-            tongue_quality=medical_record.tongue_quality,
-            tongue_shape=medical_record.tongue_shape,
-            tongue_color=medical_record.tongue_color,
-            tongue_coating=medical_record.tongue_coating,
-            menstruation_start=medical_record.menstruation_start,
-            menstruation_end=medical_record.menstruation_end
-        )
-        db.add(db_record)
-        db.flush()  # 確保主記錄有ID
-
-        # 添加診斷記錄
+        db_record = create_main_record(medical_record, db)
+        
+        # 添加診斷記錄，確保即使沒有診斷資料也創建一個空的診斷記錄
         if medical_record.diagnosis:
-            # 確保 modern_diseases 和 cm_syndromes 始終為列表
-            modern_diseases = medical_record.diagnosis.modern_diseases or []
-            cm_syndromes = medical_record.diagnosis.cm_syndromes or []
-
-            diagnosis = Diagnosis(
-                medical_record_id=db_record.id,
-                modern_diseases=modern_diseases,
-                cm_syndromes=cm_syndromes,
-                cm_principle=medical_record.diagnosis.cm_principle
+            create_diagnosis_record(db_record.id, medical_record.diagnosis, db)
+        else:
+            # 創建一個空的診斷記錄
+            empty_diagnosis = DiagnosisCreate(
+                modern_diseases=[],
+                cm_syndromes=[],
+                cm_principle=None
             )
-            db.add(diagnosis)
-
-        # 添加處方記錄
-        if medical_record.prescription:
-            prescription = Prescription(
-                medical_record_id=db_record.id,
-                instructions=medical_record.prescription.instructions
-            )
+            create_diagnosis_record(db_record.id, empty_diagnosis, db)
             
-            # 儲存結構化服法為JSON
-            if medical_record.prescription.structured_instructions:
-                # 如果prescription.structured_data不存在，則初始化為空字典
-                if not hasattr(prescription, 'structured_data') or prescription.structured_data is None:
-                    prescription.structured_data = {}
-                
-                # 將structured_instructions存入structured_data字典
-                prescription.structured_data = {
-                    "structured_instructions": medical_record.prescription.structured_instructions.dict(),
-                    **(prescription.structured_data or {})
-                }
-            
-            db.add(prescription)
-            db.flush()  # 確保處方有ID
-
-            # 添加中藥項目
-            for item in medical_record.prescription.herbs:
-                herb_item = HerbItem(
-                    prescription_id=prescription.id,
-                    herb_name=item.herb_name,
-                    amount=item.amount,
-                    unit=item.unit,
-                    sequence=item.sequence,
-                    source=item.source,
-                    structured_data=item.structured_data
-                )
-                db.add(herb_item)
-
-        # 添加治療記錄
-        if medical_record.treatment:
-            treatment = Treatment(
-                medical_record_id=db_record.id
+        # 添加處方記錄，確保即使沒有處方資料也創建一個空的處方記錄    
+        if medical_record.prescription and medical_record.prescription.herbs:
+            create_prescription_record(db_record.id, medical_record.prescription, db)
+        else:
+            # 創建一個空的處方記錄
+            empty_prescription = PrescriptionCreate(
+                instructions="",
+                structured_instructions=StructuredInstructions(
+                    total_days=7,
+                    times_per_day=2,
+                    timing="早晚服"
+                ),
+                herbs=[]
             )
-            db.add(treatment)
-            db.flush()  # 確保治療記錄有ID
+            create_prescription_record(db_record.id, empty_prescription, db)
+            
+        # 添加治療記錄，確保即使沒有治療資料也創建一個空的治療記錄    
+        if medical_record.treatment and medical_record.treatment.treatment_items:
+            _extracted_from_create_treatment_record_4(
+                medical_record.treatment, db_record.id, db
+            )
+        else:
+            # 創建一個空的治療方法記錄
+            empty_treatment = TreatmentCreate(
+                treatment_items=[]
+            )
+            _extracted_from_create_treatment_record_4(
+                empty_treatment, db_record.id, db
+            )
 
-            # 添加治療方法項目
-            for item in medical_record.treatment.treatment_items:
-                treatment_item = TreatmentItem(
-                    treatment_id=treatment.id,
-                    method=item.method,
-                    target=item.target,
-                    description=item.description,
-                    sequence=item.sequence
-                )
-                db.add(treatment_item)
-
+        # 提交所有更改
         db.commit()
-        db.refresh(db_record)
+        
+        # 強制使用完整查詢，確保關聯數據被正確加載
+        refreshed_record = reload_record_with_relations(db_record.id, db)
+            
+        # 從候診清單中移除患者
+        try_remove_from_waiting_list(medical_record.patient_id, db)
 
-        # 創建醫療記錄後，從候診清單中移除患者
-        try:
-            remove_from_waiting_list(db, medical_record.patient_id)
-            logger.info(f"患者 {medical_record.patient_id} 已從候診清單中移除")
-        except Exception as waiting_err:
-            logger.error(f"從候診清單移除患者時出錯: {str(waiting_err)}")
-            # 不中斷主流程，繼續
-
-        # 返回響應數據
-        return db_record
+        # 返回響應數據，確保有完整的資料結構
+        logger.info(f"成功返回完整醫療記錄: id={refreshed_record.id}, record_id={refreshed_record.record_id}")
+        logger.debug(f"診斷資料數量: {len(refreshed_record.diagnoses) if hasattr(refreshed_record, 'diagnoses') else 0}")
+        logger.debug(f"處方資料數量: {len(refreshed_record.prescriptions) if hasattr(refreshed_record, 'prescriptions') else 0}")
+        logger.debug(f"治療資料數量: {len(refreshed_record.treatments) if hasattr(refreshed_record, 'treatments') else 0}")
+        
+        return refreshed_record
 
     except Exception as e:
         db.rollback()
@@ -266,6 +224,347 @@ def create_medical_record(medical_record: MedicalRecordCreate, db: Session = Dep
         ) from e
 
 
+def clean_observation_field(medical_record: MedicalRecordCreate) -> None:
+    """清理觀察欄位，確保它始終是字串"""
+    if medical_record.observation is None or medical_record.observation == {} or not isinstance(medical_record.observation, str):
+        medical_record.observation = ""
+
+
+def create_main_record(medical_record: MedicalRecordCreate, db: Session) -> MedicalRecord:
+    """創建主醫療記錄"""
+    db_record = MedicalRecord(
+        patient_id=medical_record.patient_id,
+        doctor_id=medical_record.doctor_id,
+        appointment_id=medical_record.appointment_id,
+        is_first_visit=medical_record.is_first_visit,
+        chief_complaint=medical_record.chief_complaint,
+        present_illness=medical_record.present_illness,
+        observation=medical_record.observation,
+        left_pulse=medical_record.left_pulse,
+        right_pulse=medical_record.right_pulse,
+        tongue_quality=medical_record.tongue_quality,
+        tongue_shape=medical_record.tongue_shape,
+        tongue_color=medical_record.tongue_color,
+        tongue_coating=medical_record.tongue_coating,
+        menstruation_start=medical_record.menstruation_start,
+        menstruation_end=medical_record.menstruation_end
+    )
+    db.add(db_record)
+    db.flush()  # 確保主記錄有ID
+    logger.info(f"創建病歷主記錄成功，ID: {db_record.id}, record_id: {db_record.record_id}")
+    return db_record
+
+
+def create_diagnosis_record(medical_record_id: int, diagnosis_data: DiagnosisCreate, db: Session) -> None:
+    """創建診斷記錄"""
+    try:
+        # 確保 modern_diseases 和 cm_syndromes 始終為列表
+        modern_diseases = diagnosis_data.modern_diseases or []
+        cm_syndromes = diagnosis_data.cm_syndromes or []
+
+        # 過濾空值，確保列表項目有有效值
+        modern_diseases = [d for d in modern_diseases if d and (isinstance(d, str) and d.strip())]
+        cm_syndromes = [s for s in cm_syndromes if s and (isinstance(s, str) and s.strip())]
+
+        logger.info(f"準備添加診斷資料: 現代疾病 {modern_diseases}, 中醫證候 {cm_syndromes}")
+
+        # 即使沒有診斷資料，也要創建診斷記錄，避免查詢時出現 null
+        diagnosis = Diagnosis(
+            medical_record_id=medical_record_id,
+            modern_diseases=modern_diseases or [],
+            cm_syndromes=cm_syndromes or [],
+            cm_principle=diagnosis_data.cm_principle or ''
+        )
+        _extracted_from_create_diagnosis_record_21(db, diagnosis, '診斷資料添加成功，ID: ')
+    except Exception as e:
+        logger.error(f"創建診斷記錄失敗: {str(e)}")
+        # 如果出錯，仍然嘗試添加一個空的診斷記錄
+        try:
+            empty_diagnosis = Diagnosis(
+                medical_record_id=medical_record_id,
+                modern_diseases=[],
+                cm_syndromes=[],
+                cm_principle=''
+            )
+            _extracted_from_create_diagnosis_record_21(
+                db, empty_diagnosis, '創建空診斷記錄成功，ID: '
+            )
+        except Exception as inner_e:
+            logger.error(f"創建空診斷記錄也失敗: {str(inner_e)}")
+            raise
+
+
+# TODO Rename this here and in `create_diagnosis_record`
+def _extracted_from_create_diagnosis_record_21(db, arg1, arg2):
+    db.add(arg1)
+    db.flush()  # 確保診斷有ID
+    logger.info(f"{arg2}{arg1.id}")
+
+
+def create_prescription_record(medical_record_id: int, prescription_data: PrescriptionCreate, db: Session) -> None:
+    """創建處方記錄"""
+    try:
+        logger.info(f"準備添加處方資料: 服用說明 {prescription_data.instructions}, 藥材數量 {len(prescription_data.herbs)}")
+        
+        prescription = Prescription(
+            medical_record_id=medical_record_id,
+            instructions=prescription_data.instructions or ""
+        )
+        
+        # 儲存結構化服法為JSON
+        if prescription_data.structured_instructions:
+            # 如果prescription.structured_data不存在，則初始化為空字典
+            if not hasattr(prescription, 'structured_data') or prescription.structured_data is None:
+                prescription.structured_data = {}
+            
+            # 將structured_instructions存入structured_data字典
+            try:
+                prescription.structured_data = {
+                    "structured_instructions": prescription_data.structured_instructions.dict(),
+                    **(prescription.structured_data or {})
+                }
+            except Exception as e:
+                logger.error(f"處理結構化服法資料時出錯: {str(e)}")
+                # 使用默認值
+                prescription.structured_data = {
+                    "structured_instructions": {
+                        "total_days": 7,
+                        "times_per_day": 2,
+                        "timing": "早晚服"
+                    }
+                }
+        else:
+            # 使用默認值
+            prescription.structured_data = {
+                "structured_instructions": {
+                    "total_days": 7,
+                    "times_per_day": 2,
+                    "timing": "早晚服"
+                }
+            }
+        
+        db.add(prescription)
+        db.flush()  # 確保處方有ID
+        logger.info(f"處方記錄添加成功，ID: {prescription.id}, prescription_id: {prescription.prescription_id}")
+
+        # 添加中藥項目，確保herbs是有效的列表
+        if prescription_data.herbs and len(prescription_data.herbs) > 0:
+            for idx, item in enumerate(prescription_data.herbs):
+                if item and item.herb_name and item.herb_name.strip():  # 只添加有藥名的項目
+                    create_herb_item(prescription.id, item, idx, db)
+        else:
+            logger.info("處方中沒有中藥項目，創建空處方")
+    except Exception as e:
+        logger.error(f"創建處方記錄失敗: {str(e)}")
+        # 如果出錯，仍然嘗試添加一個空的處方記錄
+        try:
+            empty_prescription = Prescription(
+                medical_record_id=medical_record_id,
+                instructions="",
+                structured_data={
+                    "structured_instructions": {
+                        "total_days": 7,
+                        "times_per_day": 2,
+                        "timing": "早晚服"
+                    }
+                }
+            )
+            db.add(empty_prescription)
+            db.flush()
+            logger.info(f"創建空處方記錄成功，ID: {empty_prescription.id}")
+        except Exception as inner_e:
+            logger.error(f"創建空處方記錄也失敗: {str(inner_e)}")
+            raise
+
+
+def create_herb_item(prescription_id: int, herb_data: HerbItemCreate, idx: int, db: Session) -> None:
+    """創建中藥項目"""
+    herb_item = HerbItem(
+        prescription_id=prescription_id,
+        herb_name=herb_data.herb_name,
+        amount=herb_data.amount,
+        unit=herb_data.unit,
+        sequence=herb_data.sequence or idx,
+        source=herb_data.source,
+        structured_data=herb_data.structured_data
+    )
+    db.add(herb_item)
+    db.flush()  # 確保每個中藥項目也成功寫入
+    logger.info(f"中藥項目添加成功: {herb_item.herb_name}, 劑量: {herb_item.amount}{herb_item.unit}, ID: {herb_item.id}")
+
+
+def create_treatment_record(medical_record_id: int, treatment_data: TreatmentCreate, db: Session) -> None:
+    """創建治療記錄"""
+    try:
+        _extracted_from_create_treatment_record_4(
+            treatment_data, medical_record_id, db
+        )
+    except Exception as e:
+        logger.error(f"創建治療記錄失敗: {str(e)}")
+        # 如果出錯，仍然嘗試添加一個空的治療記錄
+        try:
+            empty_treatment = _extracted_from_create_treatment_record_24(
+                medical_record_id, db, '創建空治療記錄成功，ID: '
+            )
+        except Exception as inner_e:
+            logger.error(f"創建空治療記錄也失敗: {str(inner_e)}")
+            raise
+
+
+# TODO Rename this here and in `create_treatment_record`
+def _extracted_from_create_treatment_record_24(medical_record_id, db, arg2):
+    result = Treatment(medical_record_id=medical_record_id)
+    db.add(result)
+    db.flush()
+    logger.info(f"{arg2}{result.id}")
+    return result
+
+
+# TODO Rename this here and in `create_treatment_record`
+def _extracted_from_create_treatment_record_4(treatment_data, medical_record_id, db):
+    logger.info(f"準備添加治療方法資料, 項目數量: {len(treatment_data.treatment_items)}")
+
+    treatment = _extracted_from_create_treatment_record_24(
+        medical_record_id, db, '治療記錄添加成功，ID: '
+    )
+    # 添加治療方法項目
+    if treatment_data.treatment_items and len(treatment_data.treatment_items) > 0:
+        valid_items = [item for item in treatment_data.treatment_items if item.method and item.method.strip()]
+        for idx, item in enumerate(valid_items):
+            create_treatment_item(treatment.id, item, idx, db)
+    else:
+        logger.info("治療記錄中沒有方法項目，創建空治療記錄")
+
+
+def create_treatment_item(treatment_id: int, item_data: TreatmentItemCreate, idx: int, db: Session) -> None:
+    """創建治療方法項目"""
+    treatment_item = TreatmentItem(
+        treatment_id=treatment_id,
+        method=item_data.method,
+        target=item_data.target,
+        description=item_data.description,
+        sequence=item_data.sequence or idx
+    )
+    db.add(treatment_item)
+    db.flush()  # 確保每個治療方法項目也成功寫入
+    logger.info(f"治療方法項目添加成功: {treatment_item.method}, ID: {treatment_item.id}")
+
+
+def reload_record_with_relations(record_id: int, db: Session) -> MedicalRecord:
+    """使用joinedload重新加載完整記錄，並確保所有關聯資料存在"""
+    try:
+        return _extracted_from_reload_record_with_relations_5(db, record_id)
+    except Exception as e:
+        logger.error(f"重新加載記錄時發生錯誤: {str(e)}")
+        if (
+            db_record := db.query(MedicalRecord)
+            .filter(MedicalRecord.id == record_id)
+            .first()
+        ):
+            db.refresh(db_record)
+            return db_record
+        raise e
+
+
+# TODO Rename this here and in `reload_record_with_relations`
+def _extracted_from_reload_record_with_relations_5(db, record_id):
+    # 使用完整的關聯加載查詢
+    refreshed_record = db.query(MedicalRecord).filter(
+        MedicalRecord.id == record_id
+    ).options(
+        joinedload(MedicalRecord.diagnoses),
+        joinedload(MedicalRecord.prescriptions).joinedload(Prescription.herbs),
+        joinedload(MedicalRecord.treatments).joinedload(Treatment.treatment_items)
+    ).first()
+
+    if not refreshed_record:
+        logger.warning(f"無法加載完整記錄，ID: {record_id}")
+        db_record = db.query(MedicalRecord).filter(MedicalRecord.id == record_id).first()
+        if not db_record:
+            logger.error(f"無法找到醫療記錄，ID: {record_id}")
+            raise HTTPException(status_code=404, detail=f"無法找到醫療記錄 ID: {record_id}")
+
+        # 先刷新基本記錄
+        db.refresh(db_record)
+
+        # 檢查並創建缺失的關聯記錄
+        # 1. 檢查診斷記錄
+        diagnoses = db.query(Diagnosis).filter(Diagnosis.medical_record_id == record_id).all()
+        if not diagnoses:
+            logger.warning(f"醫療記錄 {record_id} 缺少診斷記錄，創建空診斷記錄")
+            empty_diagnosis = Diagnosis(
+                medical_record_id=record_id,
+                modern_diseases=[],
+                cm_syndromes=[],
+                cm_principle=""
+            )
+            db.add(empty_diagnosis)
+            db.flush()
+
+        # 2. 檢查處方記錄
+        prescriptions = db.query(Prescription).filter(Prescription.medical_record_id == record_id).all()
+        if not prescriptions:
+            logger.warning(f"醫療記錄 {record_id} 缺少處方記錄，創建空處方記錄")
+            empty_prescription = Prescription(
+                medical_record_id=record_id,
+                instructions="",
+                structured_data={
+                    "structured_instructions": {
+                        "total_days": 7,
+                        "times_per_day": 2,
+                        "timing": "早晚服"
+                    }
+                }
+            )
+            db.add(empty_prescription)
+            db.flush()
+
+        # 3. 檢查治療記錄
+        treatments = db.query(Treatment).filter(Treatment.medical_record_id == record_id).all()
+        if not treatments:
+            logger.warning(f"醫療記錄 {record_id} 缺少治療記錄，創建空治療記錄")
+            empty_treatment = Treatment(
+                medical_record_id=record_id
+            )
+            db.add(empty_treatment)
+            db.flush()
+
+        # 提交更改
+        db.commit()
+
+        # 重新查詢完整記錄
+        refreshed_record = db.query(MedicalRecord).filter(
+            MedicalRecord.id == record_id
+        ).options(
+            joinedload(MedicalRecord.diagnoses),
+            joinedload(MedicalRecord.prescriptions).joinedload(Prescription.herbs),
+            joinedload(MedicalRecord.treatments).joinedload(Treatment.treatment_items)
+        ).first()
+
+    # 再次確認關聯資料是否完整，仍不完整則記錄警告
+    if not refreshed_record:
+        logger.error(f"即使在修復嘗試後仍無法加載完整記錄，ID: {record_id}")
+        return db_record  # 無奈之下返回基本記錄
+
+    # 記錄加載的關聯數據情況
+    logger.info(f"成功加載醫療記錄 {record_id} 的關聯數據:")
+    logger.info(f"- 診斷記錄: {len(refreshed_record.diagnoses)}")
+    logger.info(f"- 處方記錄: {len(refreshed_record.prescriptions)}")
+    logger.info(f"- 治療記錄: {len(refreshed_record.treatments)}")
+
+    return refreshed_record
+
+
+def try_remove_from_waiting_list(patient_id: int, db: Session) -> None:
+    """嘗試從候診清單中移除患者"""
+    try:
+        remove_from_waiting_list(db, patient_id)
+        logger.info(f"患者 {patient_id} 已從候診清單中移除")
+    except Exception as waiting_err:
+        logger.error(f"從候診清單移除患者時出錯: {str(waiting_err)}")
+        # 不中斷主流程，繼續
+
+
 @router.get("/{record_id}", response_model=MedicalRecordResponse)
 def get_medical_record(record_id: str, db: Session = Depends(get_db)):
     """獲取特定醫療記錄"""
@@ -273,9 +572,18 @@ def get_medical_record(record_id: str, db: Session = Depends(get_db)):
         # 嘗試按ID或record_id查詢
         try:
             record_id_int = int(record_id)
-            db_record = db.query(MedicalRecord).filter(MedicalRecord.id == record_id_int).first()
+            query = db.query(MedicalRecord).filter(MedicalRecord.id == record_id_int)
         except ValueError:
-            db_record = db.query(MedicalRecord).filter(MedicalRecord.record_id == record_id).first()
+            query = db.query(MedicalRecord).filter(MedicalRecord.record_id == record_id)
+        
+        # 添加 joinedload 預加載所有關聯數據
+        query = query.options(
+            joinedload(MedicalRecord.diagnoses),
+            joinedload(MedicalRecord.prescriptions).joinedload(Prescription.herbs),
+            joinedload(MedicalRecord.treatments).joinedload(Treatment.treatment_items)
+        )
+        
+        db_record = query.first()
         
         if not db_record:
             raise HTTPException(
@@ -347,54 +655,10 @@ def get_patient_medical_records(
     offset: int = Query(0, description="跳過的記錄數"),
     db: Session = Depends(get_db)
 ):
-    """獲取指定患者的醫療記錄"""
-    records = db.query(MedicalRecord).filter(
-        MedicalRecord.patient_id == patient_id
-    ).order_by(
-        MedicalRecord.visit_date.desc()
-    ).offset(offset).limit(limit).all()
-    
-    # 為診斷資料添加證候詳細資訊
-    for record in records:
-        # 清理數據格式
-        if hasattr(record, 'observation') and (record.observation is None or record.observation == {} or isinstance(record.observation, dict) and not record.observation):
-            record.observation = ""
-        
-        # 處理處方的結構化服法數據
-        if record.prescriptions and len(record.prescriptions) > 0:
-            prescription = record.prescriptions[0]
-            # 如果有structured_data且包含structured_instructions
-            if hasattr(prescription, 'structured_data') and prescription.structured_data and 'structured_instructions' in prescription.structured_data:
-                # 將結構化服法數據設置到prescription中
-                setattr(prescription, 'structured_instructions', prescription.structured_data.get('structured_instructions'))
-            else:
-                # 若無，提供默認值
-                setattr(prescription, 'structured_instructions', {
-                    "total_days": 7,
-                    "times_per_day": 2,
-                    "timing": "早晚服"
-                })
-        
-        if record.diagnoses and record.diagnoses[0]:
-            # 取得最新的診斷
-            diagnosis = record.diagnoses[0]
-            
-            # 確保 modern_diseases 和 cm_syndromes 始終為列表
-            if diagnosis.modern_diseases is None:
-                diagnosis.modern_diseases = []
-            if diagnosis.cm_syndromes is None:
-                diagnosis.cm_syndromes = []
-            
-            # 將 cm_syndromes 列表轉換為完整的證候資訊
-            syndrome_info_list = [
-                SyndromeInfo(**get_syndrome_info(code))
-                for code in diagnosis.cm_syndromes if code
-            ]
-            
-            # 在不修改 DB 模型的情況下附加這個資訊
-            setattr(diagnosis, 'cm_syndromes_info', syndrome_info_list)
-    
-    return records
+    """獲取指定患者的醫療記錄（舊格式，保留向後兼容）"""
+    # 調用新格式的端點處理函數
+    logger.info(f"使用舊格式端點獲取患者 {patient_id} 的醫療記錄，重定向到新格式")
+    return get_medical_records_by_patient(patient_id, limit, offset, db)
 
 
 @router.get("/", response_model=List[MedicalRecordResponse])
@@ -620,8 +884,13 @@ def get_medical_records_by_patient(
 ):
     """獲取指定患者的醫療記錄"""
     try:
+        # 修改查詢方式，使用 joinedload 預加載關聯數據
         records = db.query(MedicalRecord).filter(
             MedicalRecord.patient_id == patient_id
+        ).options(
+            joinedload(MedicalRecord.diagnoses),
+            joinedload(MedicalRecord.prescriptions).joinedload(Prescription.herbs),
+            joinedload(MedicalRecord.treatments).joinedload(Treatment.treatment_items)
         ).order_by(
             MedicalRecord.visit_date.desc()
         ).offset(offset).limit(limit).all()
@@ -647,7 +916,7 @@ def get_medical_records_by_patient(
                         "timing": "早晚服"
                     })
             
-            if record.diagnoses and record.diagnoses[0]:
+            if record.diagnoses and len(record.diagnoses) > 0:
                 # 取得最新的診斷
                 diagnosis = record.diagnoses[0]
                 
