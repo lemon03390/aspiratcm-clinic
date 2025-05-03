@@ -14,5 +14,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # 複製 backend 內容
 COPY backend/ ./
 
+# 確保 data 目錄存在
+RUN mkdir -p /app/data
+
 # 啟動 FastAPI
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]

@@ -20,11 +20,14 @@ COPY frontend/.env.production .env.production
 # 複製整個前端應用
 COPY frontend/ ./
 
+# 確保所有依賴都正確安裝
+RUN npm install --unsafe-perm
+
 # ✅ 印出實際環境變數值（debug）
 RUN cat .env.production
 
-# 執行編譯
-RUN npm run build
+# 執行編譯（嘗試最多 3 次，確保成功）
+RUN npm run build || (npm install --unsafe-perm && npm run build) || (npm ci && npm run build)
 
 # 暴露 Next.js port（預設為 3000）
 EXPOSE 3000
