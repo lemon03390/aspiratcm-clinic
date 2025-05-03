@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: "https://clinic.aspiratcm.com/api/v1"  # ✅ 傳入 build 階段
+    container_name: frontend
+    ports:
+      - "3000:3000"
+    volumes: []
+    environment:
+      API_BASE_URL: https://clinic.aspiratcm.com/api/v1
+      NEXT_PUBLIC_API_BASE_URL: https://clinic.aspiratcm.com/api/v1
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - postgres-clinic
+    environment:
+      - DB_HOST=postgres-clinic
+      - DB_PORT=5432
+      - DB_DATABASE=clinic
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=postgres
+    command: >
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers
+
+  postgres-clinic:
+    image: postgres:15
+    container_name: postgres-clinic
+    environment:
+      - POSTGRES_DB=clinic
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
