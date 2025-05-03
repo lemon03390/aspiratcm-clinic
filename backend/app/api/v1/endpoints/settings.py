@@ -21,7 +21,8 @@ VALID_CATEGORIES = [
     CategoryEnum.CM_SYNDROME,
     CategoryEnum.TCM_TREATMENT_RULE,
     CategoryEnum.TCM_TREATMENT_METHOD,
-    CategoryEnum.TCM_SINGLE_HERB
+    CategoryEnum.TCM_SINGLE_HERB,
+    CategoryEnum.REFERRAL_SOURCE
 ]
 
 # 依類別獲取所有設定

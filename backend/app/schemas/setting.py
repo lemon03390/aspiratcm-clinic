@@ -48,4 +48,5 @@ class CategoryEnum:
     CM_SYNDROME = "cm_syndrome"
     TCM_TREATMENT_RULE = "tcm_treatment_rule"
     TCM_TREATMENT_METHOD = "tcm_treatment_method"
-    TCM_SINGLE_HERB = "tcm_single_herb" 
+    TCM_SINGLE_HERB = "tcm_single_herb"
+    REFERRAL_SOURCE = "referral_source"  # 介紹人來源 

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 
 // 自定義圖標組件替代 heroicons
 const ChevronDownIcon = (props) => (
@@ -53,6 +53,21 @@ interface SystemSettingLayoutProps {
 
 export default function SystemSettingLayout({ children }: SystemSettingLayoutProps) {
   const pathname = usePathname();
+  const [currentHash, setCurrentHash] = useState<string>('');
+
+  // 監聽hash變化
+  useEffect(() => {
+    setCurrentHash(window.location.hash);
+
+    const handleHashChange = () => {
+      setCurrentHash(window.location.hash);
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, []);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -64,7 +79,7 @@ export default function SystemSettingLayout({ children }: SystemSettingLayoutPro
       <div className="mb-6">
         <div className="flex border-b border-gray-200">
           <Link href="/admin/settings">
-            <span className={`px-4 py-2 text-sm font-medium ${pathname === '/admin/settings'
+            <span className={`px-4 py-2 text-sm font-medium ${pathname === '/admin/settings' && currentHash === ''
               ? 'text-blue-600 border-b-2 border-blue-600'
               : 'text-gray-500 hover:text-gray-700'
               }`}>
@@ -77,6 +92,14 @@ export default function SystemSettingLayout({ children }: SystemSettingLayoutPro
               : 'text-gray-500 hover:text-gray-700'
               }`}>
               醫師管理
+            </span>
+          </Link>
+          <Link href="/admin/settings/referral-management">
+            <span className={`px-4 py-2 text-sm font-medium ${pathname === '/admin/settings/referral-management'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}>
+              介紹人管理
             </span>
           </Link>
         </div>

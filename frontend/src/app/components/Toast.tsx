@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import { useCallback, useState } from "react";
 
 interface Toast {
   id: string;
@@ -54,13 +54,12 @@ export function useToast() {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`px-4 py-2 rounded-md shadow-lg flex items-center ${
-              toast.type === "success"
+            className={`px-4 py-2 rounded-md shadow-lg flex items-center ${toast.type === "success"
                 ? "bg-green-500 text-white"
                 : toast.type === "error"
-                ? "bg-red-500 text-white"
-                : "bg-blue-500 text-white"
-            }`}
+                  ? "bg-red-500 text-white"
+                  : "bg-blue-500 text-white"
+              }`}
           >
             <span>{toast.message}</span>
             <button

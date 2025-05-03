@@ -53,7 +53,8 @@ const CATEGORIES = [
   { key: 'cm_syndrome', title: '中醫辨證', description: '中醫辨證分類及描述' },
   { key: 'tcm_treatment_rule', title: '中醫治則', description: '中醫治療原則' },
   { key: 'tcm_treatment_method', title: '中醫療法', description: '中醫治療方法' },
-  { key: 'tcm_single_herb', title: '中藥資料', description: '中藥單方資料庫' }
+  { key: 'tcm_single_herb', title: '中藥資料', description: '中藥單方資料庫' },
+  { key: 'referral_source', title: '介紹人選項', description: '設定可選擇的介紹人來源列表' }
 ];
 
 // 設定項類型定義
@@ -125,6 +126,45 @@ export default function TcmSettingsPage() {
       fetchSettings(activeCategory);
     }
   }, [activeCategory, searchText, expandedCategories]);
+
+  // 監聽URL hash變化，自動切換到指定類別
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+
+      // 檢查是否有效的類別
+      const isValidCategory = CATEGORIES.some(category => category.key === hash);
+
+      if (isValidCategory) {
+        // 設置活動類別
+        setActiveCategory(hash);
+
+        // 展開該類別
+        setExpandedCategories(prev => {
+          const newSet = new Set(prev);
+          newSet.add(hash);
+          return newSet;
+        });
+
+        // 滾動到該類別
+        setTimeout(() => {
+          const element = document.getElementById(hash);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth' });
+          }
+        }, 100);
+      }
+    };
+
+    // 頁面載入時處理hash
+    handleHashChange();
+
+    // 監聽hash變化
+    window.addEventListener('hashchange', handleHashChange);
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, []);
 
   // 處理類別變更
   const handleCategoryChange = (key: string) => {
@@ -263,7 +303,7 @@ export default function TcmSettingsPage() {
 
       <div className="space-y-4">
         {CATEGORIES.map(category => (
-          <div key={category.key} className="border border-gray-200 rounded-md">
+          <div key={category.key} id={category.key} className="border border-gray-200 rounded-md">
             <div
               className="flex justify-between items-center p-4 bg-gray-50 cursor-pointer"
               onClick={() => toggleCategory(category.key)}

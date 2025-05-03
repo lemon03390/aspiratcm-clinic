@@ -43,6 +43,8 @@ class AppointmentBase(BaseModel):
     is_first_time: Optional[int] = 0
     is_troublesome: Optional[int] = 0
     is_contagious: Optional[int] = 0
+    referral_source: Optional[str] = None  # 介紹人
+    referral_notes: Optional[str] = None  # 備註
 
 class AppointmentCreate(AppointmentBase):
     pass
@@ -59,6 +61,8 @@ class AppointmentUpdate(BaseModel):
     is_first_time: Optional[int] = None
     is_troublesome: Optional[int] = None
     is_contagious: Optional[int] = None
+    referral_source: Optional[str] = None  # 介紹人
+    referral_notes: Optional[str] = None  # 備註
 
 class AppointmentResponse(BaseModel):
     id: int
@@ -73,6 +77,8 @@ class AppointmentResponse(BaseModel):
     is_first_time: Optional[int] = 0
     is_troublesome: Optional[int] = 0
     is_contagious: Optional[int] = 0
+    referral_source: Optional[str] = None  # 介紹人
+    referral_notes: Optional[str] = None  # 備註
     created_at: datetime
     updated_at: datetime
 
@@ -128,7 +134,9 @@ def build_appointment_dict(appointment, consultation_type=None) -> Dict[str, Any
         "updated_at": to_hk(appointment[10]) if appointment[10] else None,
         "is_first_time": appointment[11] if len(appointment) > 11 else 0,
         "is_troublesome": appointment[12] if len(appointment) > 12 else 0,
-        "is_contagious": appointment[13] if len(appointment) > 13 else 0
+        "is_contagious": appointment[13] if len(appointment) > 13 else 0,
+        "referral_source": appointment[14] if len(appointment) > 14 else None,
+        "referral_notes": appointment[15] if len(appointment) > 15 else None
     }
 
 # 創建一個處理consultation_type的函數來減少重複代碼
@@ -167,7 +175,7 @@ def get_appointment_query(join_type: str = "LEFT", condition: str = "") -> str:
     SELECT a.id, a.patient_name, a.phone_number, d.name as doctor_name, 
            a.appointment_time, a.status, a.next_appointment, 
            a.related_appointment_id, a.consultation_type, a.created_at, a.updated_at,
-           a.is_first_time, a.is_troublesome, a.is_contagious
+           a.is_first_time, a.is_troublesome, a.is_contagious, a.referral_source, a.referral_notes
     FROM appointments a
     {join_type} JOIN doctors d ON a.doctor_id = d.id
     """
@@ -325,12 +333,12 @@ def create_appointment(request: Request, appointment: AppointmentCreate, db: Ses
         INSERT INTO appointments (
             patient_name, phone_number, doctor_id, appointment_time, status, 
             consultation_type, is_first_time, is_troublesome, is_contagious, 
-            created_at, updated_at
+            referral_source, referral_notes, created_at, updated_at
         )
         VALUES (
             :patient_name, :phone_number, :doctor_id, :appointment_time, :status, 
             :consultation_type, :is_first_time, :is_troublesome, :is_contagious, 
-            :created_at, :updated_at
+            :referral_source, :referral_notes, :created_at, :updated_at
         )
         RETURNING id
         """)
@@ -345,6 +353,8 @@ def create_appointment(request: Request, appointment: AppointmentCreate, db: Ses
             "is_first_time": appointment.is_first_time,
             "is_troublesome": appointment.is_troublesome,
             "is_contagious": appointment.is_contagious,
+            "referral_source": appointment.referral_source,
+            "referral_notes": appointment.referral_notes,
             "created_at": now,
             "updated_at": now
         }
@@ -365,6 +375,8 @@ def create_appointment(request: Request, appointment: AppointmentCreate, db: Ses
             "is_first_time": appointment.is_first_time,
             "is_troublesome": appointment.is_troublesome,
             "is_contagious": appointment.is_contagious,
+            "referral_source": appointment.referral_source,
+            "referral_notes": appointment.referral_notes,
             "created_at": now,
             "updated_at": now
         }
@@ -432,6 +444,14 @@ def build_update_params(appointment: AppointmentUpdate, original_doctor_id: int,
     if appointment.phone_number is not None:
         update_fields.append("phone_number = :phone_number")
         params["phone_number"] = appointment.phone_number
+        
+    if appointment.referral_source is not None:
+        update_fields.append("referral_source = :referral_source")
+        params["referral_source"] = appointment.referral_source
+        
+    if appointment.referral_notes is not None:
+        update_fields.append("referral_notes = :referral_notes")
+        params["referral_notes"] = appointment.referral_notes
     
     # 處理醫生相關字段...
     

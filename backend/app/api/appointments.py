@@ -49,6 +49,8 @@ class AppointmentBase(BaseModel):
     is_first_time: Optional[int] = 0
     is_troublesome: Optional[int] = 0
     is_contagious: Optional[int] = 0
+    referral_source: Optional[str] = None  # 新增：介紹人來源
+    referral_notes: Optional[str] = None  # 新增：備註
 
 class AppointmentCreate(AppointmentBase):
     pass
@@ -65,6 +67,8 @@ class AppointmentUpdate(BaseModel):
     is_first_time: Optional[int] = None
     is_troublesome: Optional[int] = None
     is_contagious: Optional[int] = None
+    referral_source: Optional[str] = None  # 新增：介紹人來源
+    referral_notes: Optional[str] = None  # 新增：備註
 
 class AppointmentResponse(BaseModel):
     id: int
@@ -79,6 +83,8 @@ class AppointmentResponse(BaseModel):
     is_first_time: Optional[int] = 0
     is_troublesome: Optional[int] = 0
     is_contagious: Optional[int] = 0
+    referral_source: Optional[str] = None  # 新增：介紹人來源
+    referral_notes: Optional[str] = None  # 新增：備註
     created_at: datetime
     updated_at: datetime
 
@@ -278,7 +284,9 @@ def build_appointment_dict(appointment, consultation_type=None) -> Dict[str, Any
             "updated_at": to_hk(appointment[10]) if len(appointment) > 10 and appointment[10] else to_hk(now_hk()),
             "is_first_time": get_optional_field(appointment, 11),
             "is_troublesome": get_optional_field(appointment, 12),
-            "is_contagious": get_optional_field(appointment, 13)
+            "is_contagious": get_optional_field(appointment, 13),
+            "referral_source": appointment[14] if len(appointment) > 14 else None,
+            "referral_notes": appointment[15] if len(appointment) > 15 else None
         }
     except Exception as e:
         logger.error(f"構建預約字典時出錯: {str(e)}, 預約記錄: {appointment}")
@@ -358,7 +366,8 @@ def get_appointment_query(join_type: str = "LEFT", condition: str = "") -> str:
     SELECT a.id, a.patient_name, a.phone_number, d.name as doctor_name, 
            a.appointment_time, a.status, a.next_appointment, 
            a.related_appointment_id, a.consultation_type, a.created_at, a.updated_at,
-           a.is_first_time, a.is_troublesome, a.is_contagious
+           a.is_first_time, a.is_troublesome, a.is_contagious,
+           a.referral_source, a.referral_notes
     FROM appointments a
     {join_type} JOIN doctors d ON a.doctor_id = d.id
     """
@@ -544,7 +553,8 @@ async def get_appointment_by_id(request: Request, appointment_id: int, db: Sessi
             a.id, a.patient_name, a.phone_number, d.name as doctor_name, 
             a.appointment_time, a.status, a.next_appointment, 
             a.related_appointment_id, a.consultation_type, a.created_at, a.updated_at,
-            a.is_first_time, a.is_troublesome, a.is_contagious
+            a.is_first_time, a.is_troublesome, a.is_contagious,
+            a.referral_source, a.referral_notes
         FROM 
             appointments a
         LEFT JOIN 
@@ -645,12 +655,12 @@ async def create_appointment(request: Request, appointment: AppointmentCreate, d
         INSERT INTO appointments (
             patient_name, phone_number, doctor_id, appointment_time, status, 
             consultation_type, is_first_time, is_troublesome, is_contagious, 
-            created_at, updated_at
+            created_at, updated_at, referral_source, referral_notes
         )
         VALUES (
             :patient_name, :phone_number, :doctor_id, :appointment_time, :status, 
             :consultation_type, :is_first_time, :is_troublesome, :is_contagious, 
-            :created_at, :updated_at
+            :created_at, :updated_at, :referral_source, :referral_notes
         )
         RETURNING id
         """)
@@ -665,6 +675,8 @@ async def create_appointment(request: Request, appointment: AppointmentCreate, d
             "is_first_time": appointment.is_first_time,
             "is_troublesome": appointment.is_troublesome,
             "is_contagious": appointment.is_contagious,
+            "referral_source": appointment.referral_source,
+            "referral_notes": appointment.referral_notes,
             "created_at": now,
             "updated_at": now
         }
@@ -687,6 +699,8 @@ async def create_appointment(request: Request, appointment: AppointmentCreate, d
             "is_first_time": appointment.is_first_time,
             "is_troublesome": appointment.is_troublesome,
             "is_contagious": appointment.is_contagious,
+            "referral_source": appointment.referral_source,
+            "referral_notes": appointment.referral_notes,
             "created_at": now,
             "updated_at": now
         }
@@ -712,99 +726,83 @@ async def update_appointment(request: Request, appointment_id: int, appointment_
         patient_name = appointment[0]
         logger.info(f"找到預約 ID: {appointment_id}, 患者: {patient_name}")
         
-        # 準備更新的數據
-        update_data = {}
-        
-        # 資料轉換與處理
-        if appointment_update.patient_name:
-            update_data["patient_name"] = appointment_update.patient_name
-        
-        if appointment_update.phone_number:
-            update_data["phone_number"] = appointment_update.phone_number
-        
-        if appointment_update.status:
-            update_data["status"] = appointment_update.status
-        
-        if appointment_update.next_appointment:
-            update_data["next_appointment"] = appointment_update.next_appointment
-        
-        if appointment_update.related_appointment_id is not None:
-            update_data["related_appointment_id"] = appointment_update.related_appointment_id
-        
-        if appointment_update.consultation_type:
-            update_data["consultation_type"] = json.dumps(appointment_update.consultation_type)
-        
-        if appointment_update.is_first_time is not None:
-            update_data["is_first_time"] = appointment_update.is_first_time
-        
-        if appointment_update.is_troublesome is not None:
-            update_data["is_troublesome"] = appointment_update.is_troublesome
-        
-        if appointment_update.is_contagious is not None:
-            update_data["is_contagious"] = appointment_update.is_contagious
+        # 從模型中提取所有非空字段
+        update_data = _extract_non_empty_fields(appointment_update)
         
         # 處理醫生相關的更新
         if appointment_update.doctor_name:
-            # 通過醫生名稱查詢醫生ID
-            doctor_query = text("SELECT id FROM doctors WHERE name = :name")
-            if not (doctor := db.execute(doctor_query, {"name": appointment_update.doctor_name}).fetchone()):
-                logger.warning(f"未找到醫生: {appointment_update.doctor_name}")
-                raise HTTPException(status_code=404, detail=f"未找到醫生: {appointment_update.doctor_name}")
-            
-            update_data["doctor_id"] = doctor[0]
+            update_data["doctor_id"] = _get_doctor_id(db, appointment_update.doctor_name)
         
-        # 處理預約時間的更新
-        if appointment_update.appointment_time:
-            # 如果提供了醫生名稱，檢查醫生排班
-            if appointment_update.doctor_name:
-                # 獲取醫生排班信息
-                doctor_query = text("SELECT schedule FROM doctors WHERE name = :name")
-                if doctor_result := db.execute(doctor_query, {"name": appointment_update.doctor_name}).fetchone():
-                    if schedule := doctor_result[0]:
-                        # 驗證醫生排班與預約時間是否匹配
-                        validate_doctor_schedule(
-                            appointment_update.doctor_name,
-                            schedule,
-                            appointment_update.appointment_time,
-                            db
-                        )
+        # 處理特殊字段
+        if appointment_update.consultation_type:
+            update_data["consultation_type"] = json.dumps(appointment_update.consultation_type)
             
-            update_data["appointment_time"] = appointment_update.appointment_time
+        # 驗證醫生排班與預約時間
+        if appointment_update.appointment_time and appointment_update.doctor_name:
+            _validate_doctor_appointment(db, appointment_update.doctor_name, appointment_update.appointment_time)
         
         # 如果沒有數據需要更新，直接返回當前數據
         if not update_data:
-            logger.info(f"沒有數據需要更新, ID: {appointment_id}")
-            
-            # 查詢最新數據
-            query_string = get_appointment_query("LEFT", "a.id = :appointment_id")
-            query = text(query_string)
-            appointment = db.execute(query, {"appointment_id": appointment_id}).fetchone()
-            
-            consultation_type = parse_consultation_type(appointment[8])
-            return build_appointment_dict(appointment, consultation_type)
+            return _get_current_appointment(db, appointment_id)
         
         # 添加更新時間
         update_data["updated_at"] = now_hk()
         
-        # 構建更新SQL
-        fields = ", ".join([f"{key} = :{key}" for key in update_data])
-        update_sql = text(f"UPDATE appointments SET {fields} WHERE id = :id")
-        
         # 執行更新
-        params = {**update_data, "id": appointment_id}
-        logger.info(f"執行更新SQL: {update_sql.text}, 參數: {params}")
-        db.execute(update_sql, params)
-        # 交易會在 with 區塊結束時自動提交
-        
+        _update_appointment_record(db, appointment_id, update_data)
         logger.info(f"成功更新預約 ID: {appointment_id}")
         
-        # 查詢更新後的數據
-        query_string = get_appointment_query("LEFT", "a.id = :appointment_id")
-        query = text(query_string)
-        updated_appointment = db.execute(query, {"appointment_id": appointment_id}).fetchone()
-        
-        consultation_type = parse_consultation_type(updated_appointment[8])
-        return build_appointment_dict(updated_appointment, consultation_type)
+        # 返回更新後的數據
+        return _get_current_appointment(db, appointment_id)
+
+def _extract_non_empty_fields(appointment_update: AppointmentUpdate) -> dict:
+    """從更新模型中提取所有非空字段"""
+    fields = [
+        "patient_name", "phone_number", "status", "next_appointment", 
+        "related_appointment_id", "is_first_time", "is_troublesome", 
+        "is_contagious", "referral_source", "referral_notes", "appointment_time"
+    ]
+    
+    update_data = {}
+    for field in fields:
+        value = getattr(appointment_update, field, None)
+        if value is not None:
+            update_data[field] = value
+            
+    return update_data
+
+def _get_doctor_id(db: Session, doctor_name: str) -> int:
+    """通過醫生名稱獲取醫生ID"""
+    doctor_query = text("SELECT id FROM doctors WHERE name = :name")
+    if not (doctor := db.execute(doctor_query, {"name": doctor_name}).fetchone()):
+        logger.warning(f"未找到醫生: {doctor_name}")
+        raise HTTPException(status_code=404, detail=f"未找到醫生: {doctor_name}")
+    return doctor[0]
+
+def _validate_doctor_appointment(db: Session, doctor_name: str, appointment_time: datetime) -> None:
+    """驗證醫生排班與預約時間是否匹配"""
+    doctor_query = text("SELECT schedule FROM doctors WHERE name = :name")
+    if doctor_result := db.execute(doctor_query, {"name": doctor_name}).fetchone():
+        if schedule := doctor_result[0]:
+            validate_doctor_schedule(doctor_name, schedule, appointment_time, db)
+
+def _update_appointment_record(db: Session, appointment_id: int, update_data: dict) -> None:
+    """執行更新SQL操作"""
+    fields = ", ".join([f"{key} = :{key}" for key in update_data])
+    update_sql = text(f"UPDATE appointments SET {fields} WHERE id = :id")
+    
+    params = {**update_data, "id": appointment_id}
+    logger.info(f"執行更新SQL: {update_sql.text}, 參數數量: {len(params)}")
+    db.execute(update_sql, params)
+
+def _get_current_appointment(db: Session, appointment_id: int) -> dict:
+    """獲取當前預約數據"""
+    query_string = get_appointment_query("LEFT", "a.id = :appointment_id")
+    query = text(query_string)
+    appointment = db.execute(query, {"appointment_id": appointment_id}).fetchone()
+    
+    consultation_type = parse_consultation_type(appointment[8])
+    return build_appointment_dict(appointment, consultation_type)
 
 # 根據預約 ID 刪除預約
 @router.delete("/{appointment_id}")
@@ -859,6 +857,8 @@ def create_fallback_dict(appointment, error) -> Dict[str, Any]:
             "doctor_name": appointment[3] if len(appointment) > 3 else "未知醫師",
             "appointment_time": appointment[4] if len(appointment) > 4 else datetime.now(timezone.utc),
             "status": "處理錯誤",
+            "referral_source": None,
+            "referral_notes": None,
             "error": str(error)
         }
     
@@ -869,5 +869,7 @@ def create_fallback_dict(appointment, error) -> Dict[str, Any]:
         "doctor_name": "未知醫師",
         "appointment_time": datetime.now(timezone.utc),
         "status": "處理錯誤",
+        "referral_source": None,
+        "referral_notes": None,
         "error": str(error)
     } 
