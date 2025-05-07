@@ -11,7 +11,7 @@ from app.api import appointments_router, doctors_router, patient_registration_ro
 from app.api.appointment_detail import router as appointment_detail_router
 from app.api import reference_data
 from app.api.v1.api import api_router as api_v1_router
-from app.core.config import ALLOWED_ORIGINS
+from app.core import ALLOWED_ORIGINS
 from app.utils.time import now_hk
 from app.api import appointment_slots
 from app.routes.appointment_notifications import router as notifications_router

@@ -5,7 +5,7 @@ from typing import List, Optional, Dict, Any, Callable
 from pydantic import BaseModel, ValidationError
 from datetime import datetime, timezone
 from app.db.session import get_db
-from app.models import Appointment, Doctor
+from app.models import Appointment, Doctor, AppointmentTag
 import logging
 import json
 import traceback
@@ -53,7 +53,7 @@ class AppointmentBase(BaseModel):
     referral_notes: Optional[str] = None  # 新增：備註
 
 class AppointmentCreate(AppointmentBase):
-    pass
+    tag_ids: Optional[List[int]] = []
 
 class AppointmentUpdate(BaseModel):
     patient_name: Optional[str] = None
@@ -69,6 +69,7 @@ class AppointmentUpdate(BaseModel):
     is_contagious: Optional[int] = None
     referral_source: Optional[str] = None  # 新增：介紹人來源
     referral_notes: Optional[str] = None  # 新增：備註
+    tag_ids: Optional[List[int]] = None
 
 class AppointmentResponse(BaseModel):
     id: int
@@ -685,6 +686,16 @@ async def create_appointment(request: Request, appointment: AppointmentCreate, d
         appointment_id = db.execute(sql, params).scalar()
         logger.info(f"預約創建成功, ID: {appointment_id}")
         
+        # 處理標籤關聯
+        if appointment.tag_ids:
+            for tag_id in appointment.tag_ids:
+                db_appointment_tag = AppointmentTag(
+                    appointment_id=appointment_id,
+                    tag_id=tag_id
+                )
+                db.add(db_appointment_tag)
+            db.commit()
+        
         # 構建響應
         response_data = {
             "id": appointment_id,
@@ -751,6 +762,22 @@ async def update_appointment(request: Request, appointment_id: int, appointment_
         # 執行更新
         _update_appointment_record(db, appointment_id, update_data)
         logger.info(f"成功更新預約 ID: {appointment_id}")
+        
+        # 更新標籤關聯
+        if appointment_update.tag_ids is not None:
+            # 刪除現有標籤關聯
+            db.query(AppointmentTag).filter(
+                AppointmentTag.appointment_id == appointment_id
+            ).delete()
+            
+            # 創建新的標籤關聯
+            for tag_id in appointment_update.tag_ids:
+                db_appointment_tag = AppointmentTag(
+                    appointment_id=appointment_id,
+                    tag_id=tag_id
+                )
+                db.add(db_appointment_tag)
+            db.commit()
         
         # 返回更新後的數據
         return _get_current_appointment(db, appointment_id)

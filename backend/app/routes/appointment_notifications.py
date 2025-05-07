@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, Request, BackgroundTasks
 from sqlalchemy.orm import Session
 import json
-import requests
+import requests  # type: ignore # 外部 HTTP 客戶端庫
 from app.db import get_db
 from app.routes.appointments import get_tomorrow_appointments
 from app.utils.time import now_hk

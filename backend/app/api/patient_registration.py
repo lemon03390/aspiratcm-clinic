@@ -94,7 +94,7 @@ class PatientBase(BaseModel):
     @validator("email", pre=True)
     def validate_email(cls, v):
         # 特殊處理：接受 no@no.com 作為有效的電子郵件
-        return v if v else "no@no.com"
+        return v or "no@no.com"
     
     # 修改驗證器，使其更寬容
     @validator("basic_diseases", pre=True)
@@ -105,7 +105,7 @@ class PatientBase(BaseModel):
             try:
                 import json
                 v = json.loads(v)
-            except:
+            except Exception:
                 return [v] if v else []
         if not isinstance(v, list):
             return [v] if v else []
@@ -119,7 +119,7 @@ class PatientBase(BaseModel):
             try:
                 import json
                 v = json.loads(v)
-            except:
+            except Exception:
                 return [v] if v else []
         if not isinstance(v, list):
             return [v] if v else []
@@ -133,7 +133,7 @@ class PatientBase(BaseModel):
             try:
                 import json
                 v = json.loads(v)
-            except:
+            except Exception:
                 return [v] if v else []
         if not isinstance(v, list):
             return [v] if v else []
@@ -142,12 +142,12 @@ class PatientBase(BaseModel):
     # 修改驗證器，使其更寬容
     @validator("data_source", pre=True)
     def validate_data_source(cls, v):
-        return v if v else "未指定"
+        return v or "未指定"
     
     # 修改驗證器，使其更寬容
     @validator("region", pre=True)
     def validate_region(cls, v):
-        return v if v else "未指定"
+        return v or "未指定"
     
     # 修改驗證器，使區域檢查更寬容
     @validator("district")
@@ -201,38 +201,37 @@ class PatientResponse(PatientBase):
     @classmethod
     def model_validate(cls, obj, *args, **kwargs):
         # 如果是 ORM 模型實例，先轉換為字典
-        if hasattr(obj, '__dict__') and not isinstance(obj, dict):
-            # 深拷貝，避免修改原始物件
-            data = dict(obj.__dict__)
-            
-            # 確保 JSON 欄位為列表
-            for field in ['basic_diseases', 'drug_allergies', 'food_allergies']:
-                if field in data:
-                    # 如果值為 None 或空，轉換為空列表
-                    if data[field] is None:
+        if not hasattr(obj, '__dict__') or isinstance(obj, dict):
+            # 如果已經是字典，則直接使用
+            return super().model_validate(obj, *args, **kwargs)
+        # 深拷貝，避免修改原始物件
+        data = dict(obj.__dict__)
+
+        # 確保 JSON 欄位為列表
+        for field in ['basic_diseases', 'drug_allergies', 'food_allergies']:
+            if field in data:
+                # 如果值為 None 或空，轉換為空列表
+                if data[field] is None:
+                    data[field] = []
+                # 如果值不是列表，但可解析為 JSON
+                elif not isinstance(data[field], list):
+                    try:
+                        if isinstance(data[field], str):
+                            import json
+                            data[field] = json.loads(data[field])
+                        # 如果仍不是列表，則強制轉換
+                        if not isinstance(data[field], list):
+                            data[field] = [data[field]] if data[field] else []
+                    except Exception as e:
+                        logger.warning(f"解析 {field} 時出錯: {str(e)}，使用空列表替代")
                         data[field] = []
-                    # 如果值不是列表，但可解析為 JSON
-                    elif not isinstance(data[field], list):
-                        try:
-                            if isinstance(data[field], str):
-                                import json
-                                data[field] = json.loads(data[field])
-                            # 如果仍不是列表，則強制轉換
-                            if not isinstance(data[field], list):
-                                data[field] = [data[field]] if data[field] else []
-                        except Exception as e:
-                            logger.warning(f"解析 {field} 時出錯: {str(e)}，使用空列表替代")
-                            data[field] = []
-            
-            # 移除不需要的 SQLAlchemy 欄位
-            if '_sa_instance_state' in data:
-                del data['_sa_instance_state']
-                
-            # 使用處理後的資料創建實例
-            return super().model_validate(data, *args, **kwargs)
-        
-        # 如果已經是字典，則直接使用
-        return super().model_validate(obj, *args, **kwargs)
+
+        # 移除不需要的 SQLAlchemy 欄位
+        if '_sa_instance_state' in data:
+            del data['_sa_instance_state']
+
+        # 使用處理後的資料創建實例
+        return super().model_validate(data, *args, **kwargs)
 
 
 class PatientUpdate(BaseModel):
@@ -441,138 +440,107 @@ async def get_patient_by_phone_number(phone_number: str, db: Session = Depends(g
 # 獲取單個患者詳情
 @router.get("/{patient_id}", response_model=PatientResponse)
 async def get_patient(patient_id: int, db: Session = Depends(get_db)):
-    """
-    根據患者ID獲取詳細資料
-    """
+    """根據患者ID獲取詳細資料"""
     try:
         logger.info(f"開始查詢患者資料，ID: {patient_id}")
-        
-        # 確保 patient_id 是有效的整數
+
+        # 驗證患者 ID
         if not isinstance(patient_id, int) or patient_id <= 0:
             logger.warning(f"無效的患者ID格式: {patient_id}")
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"無效的患者ID格式: {patient_id}，必須是正整數"
             )
-            
-        # 執行查詢並使用 first() 確保返回單個結果或 None
-        query = db.query(Patient).filter(Patient.id == patient_id)
-        logger.debug(f"執行DB查詢: {str(query)}")
-        
-        patient = query.first()
-        
-        # 如果找不到患者，返回404而非500
+
+        # 執行查詢
+        patient = db.query(Patient).filter(Patient.id == patient_id).first()
+
+        # 檢查患者是否存在
         if not patient:
             logger.warning(f"找不到ID為 {patient_id} 的患者")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"編號為 {patient_id} 的患者不存在"
             )
-            
-        # 診斷: 輸出患者關鍵欄位以確保資料正確性
-        logger.debug(f"患者基本資訊: ID={patient.id}, 姓名={patient.chinese_name}, 電話={patient.phone_number}")
-        
-        # 診斷: 檢查 JSON 欄位類型
-        for field_name in ['basic_diseases', 'drug_allergies', 'food_allergies']:
-            field_value = getattr(patient, field_name, None)
-            logger.debug(f"欄位 {field_name}: 類型={type(field_value)}, 值={field_value}")
-            
-            # 嘗試格式化 JSON 欄位
-            if field_value is None:
-                setattr(patient, field_name, [])
-                logger.debug(f"欄位 {field_name} 為 None，已轉換為空列表")
-            elif isinstance(field_value, str):
-                try:
-                    import json
-                    parsed_value = json.loads(field_value)
-                    if isinstance(parsed_value, list):
-                        setattr(patient, field_name, parsed_value)
-                    else:
-                        setattr(patient, field_name, [parsed_value] if parsed_value else [])
-                    logger.debug(f"欄位 {field_name} 為字串，已轉換為: {getattr(patient, field_name)}")
-                except json.JSONDecodeError:
-                    setattr(patient, field_name, [field_value] if field_value else [])
-                    logger.debug(f"欄位 {field_name} 字串解析失敗，已轉換為單元素列表")
-            elif not isinstance(field_value, list):
-                setattr(patient, field_name, [field_value] if field_value else [])
-                logger.debug(f"欄位 {field_name} 非列表類型，已轉換為單元素列表")
-        
-        # 將患者資料轉換為響應模型
+
+        # 處理患者的 JSON 欄位
+        sanitize_patient_json_fields(patient)
+
+        # 轉換為響應模型
         try:
             response_data = PatientResponse.model_validate(patient)
             logger.info(f"成功獲取並轉換患者 {patient_id} 資料")
-            
-            # 診斷: 確認轉換後的資料格式正確
-            logger.debug(f"響應模型欄位: 'basic_diseases'={response_data.basic_diseases}, " 
-                        f"'drug_allergies'={response_data.drug_allergies}, "
-                        f"'food_allergies'={response_data.food_allergies}")
-            
             return response_data
         except Exception as validation_error:
-            # 處理模型驗證錯誤
             logger.error(f"資料驗證錯誤: {str(validation_error)}")
-            # 印出關鍵欄位以便診斷
-            logger.error(f"患者資料: id={patient.id}, name={patient.chinese_name}, " 
-                         f"basic_diseases={type(patient.basic_diseases)}, "
-                         f"drug_allergies={type(patient.drug_allergies)}, "
-                         f"food_allergies={type(patient.food_allergies)}")
-                         
-            # 嘗試手動構建響應
-            try:
-                import json
-                # 將患者對象轉換為字典
-                raw_dict = {
-                    "id": patient.id,
-                    "chinese_name": patient.chinese_name,
-                    "english_name": patient.english_name,
-                    "id_number": patient.id_number,
-                    "birth_date": str(patient.birth_date),
-                    "phone_number": patient.phone_number,
-                    "email": patient.email or "no@no.com",
-                    "gender": patient.gender or "",
-                    "basic_diseases": [],
-                    "drug_allergies": [],
-                    "food_allergies": [],
-                    "note": patient.note or "",
-                    "chief_complaint": patient.chief_complaint or "",
-                    "is_troublesome": patient.is_troublesome or 0,
-                    "is_contagious": patient.is_contagious or 0,
-                    "special_note": patient.special_note or "",
-                    "has_appointment": patient.has_appointment or False,
-                    "doctor_id": patient.doctor_id,
-                    "data_source": patient.data_source or "未指定",
-                    "region": patient.region or "未指定",
-                    "district": patient.district or "未指定",
-                    "sub_district": patient.sub_district or "未指定",
-                    "registration_number": patient.registration_number,
-                    "registration_datetime": patient.registration_datetime.isoformat() if patient.registration_datetime else None,
-                    "created_at": patient.created_at.isoformat() if patient.created_at else None,
-                    "updated_at": patient.updated_at.isoformat() if patient.updated_at else None,
-                }
-                
-                # 記錄診斷資訊
-                logger.debug(f"手動構建的響應字典: {json.dumps(raw_dict)}")
-                
-                # 將手動構建的字典轉換為 PatientResponse
-                return PatientResponse(**raw_dict)
-            except Exception as fallback_error:
-                logger.error(f"手動構建響應失敗: {str(fallback_error)}")
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=f"患者資料格式不正確，且無法自動修復: {str(validation_error)}"
-                ) from validation_error
-            
+            return create_fallback_response(patient)
     except HTTPException:
-        # 直接重新拋出HTTP異常，保留原始狀態碼
         raise
     except Exception as e:
-        # 捕獲所有其他異常並記錄
         logger.error(f"獲取患者資料時發生未預期錯誤，ID: {patient_id}: {str(e)}", exc_info=True)
-        # 返回 500 錯誤，但提供更有用的訊息
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"獲取患者資料時發生系統錯誤: {str(e)}"
         ) from e
+
+def sanitize_patient_json_fields(patient):
+    """清理和標準化患者的 JSON 欄位"""
+    for field_name in ['basic_diseases', 'drug_allergies', 'food_allergies']:
+        field_value = getattr(patient, field_name, None)
+        
+        if field_value is None:
+            setattr(patient, field_name, [])
+        elif isinstance(field_value, str):
+            try:
+                parsed_value = json.loads(field_value)
+                if isinstance(parsed_value, list):
+                    setattr(patient, field_name, parsed_value)
+                else:
+                    setattr(patient, field_name, [parsed_value] if parsed_value else [])
+            except json.JSONDecodeError:
+                setattr(patient, field_name, [field_value] if field_value else [])
+        elif not isinstance(field_value, list):
+            setattr(patient, field_name, [field_value] if field_value else [])
+    return patient
+
+def create_fallback_response(patient):
+    """創建備用的患者響應對象"""
+    try:
+        raw_dict = {
+            "id": patient.id,
+            "chinese_name": patient.chinese_name,
+            "english_name": patient.english_name,
+            "id_number": patient.id_number,
+            "birth_date": str(patient.birth_date),
+            "phone_number": patient.phone_number,
+            "email": patient.email or "no@no.com",
+            "gender": patient.gender or "",
+            "basic_diseases": [],
+            "drug_allergies": [],
+            "food_allergies": [],
+            "note": patient.note or "",
+            "chief_complaint": patient.chief_complaint or "",
+            "is_troublesome": patient.is_troublesome or 0,
+            "is_contagious": patient.is_contagious or 0,
+            "special_note": patient.special_note or "",
+            "has_appointment": patient.has_appointment or False,
+            "doctor_id": patient.doctor_id,
+            "data_source": patient.data_source or "未指定",
+            "region": patient.region or "未指定",
+            "district": patient.district or "未指定",
+            "sub_district": patient.sub_district or "未指定",
+            "registration_number": patient.registration_number,
+            "registration_datetime": patient.registration_datetime.isoformat() if patient.registration_datetime else None,
+            "created_at": patient.created_at.isoformat() if patient.created_at else None,
+            "updated_at": patient.updated_at.isoformat() if patient.updated_at else None,
+        }
+        return PatientResponse(**raw_dict)
+    except Exception as fallback_error:
+        logger.error(f"手動構建響應失敗: {str(fallback_error)}")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="患者資料格式不正確，且無法自動修復",
+        ) from fallback_error
 
 
 # 創建新患者

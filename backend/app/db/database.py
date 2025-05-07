@@ -1,9 +1,10 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 import os
 from dotenv import load_dotenv
 import logging
+from typing import Generator
 
 # === 設定 Logging ===
 logging.basicConfig(
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # === 從 .env 取得資料庫設定 ===
-DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_HOST = os.getenv("DB_HOST", "postgres-clinic")  # 使用 Docker 服務名稱為預設值
 DB_PORT = os.getenv("DB_PORT", "5432")
 DB_NAME = os.getenv("DB_DATABASE", "clinic")  # 提供預設值以防環境變數未設定
 DB_USER = os.getenv("DB_USERNAME", "postgres")
@@ -31,3 +32,13 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
+
+# === FastAPI Dependency 用的 DB Session 函數 ===
+def get_db() -> Generator[Session, None, None]:
+    db = SessionLocal()
+    try:
+        logger.debug("數據庫會話已創建")
+        yield db
+    finally:
+        db.close()
+        logger.debug("數據庫會話已關閉")

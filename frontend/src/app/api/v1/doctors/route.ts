@@ -1,92 +1,47 @@
-import { NextRequest, NextResponse } from 'next/server';
-import axios from 'axios';
-import { getBackendUrl } from '../../../../libs/apiClient';
+export const dynamic = 'force-dynamic';
+
+import { NextRequest } from 'next/server';
+import { getBackendUrl } from '../../../../utils/api';
 
 /**
  * 處理對 /api/v1/doctors 的GET請求
  * 代理到FastAPI後端服務
  */
-export async function GET(req: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     console.log('開始處理 /api/v1/doctors 的 GET 請求');
-    
-    // 使用統一函數獲取後端URL並添加路徑
+
+    const { searchParams } = request.nextUrl;
     const url = getBackendUrl('/doctors/');
-    console.log('代理GET請求到:', url);
-    
-    // 收集並記錄原始請求頭
-    const headers: Record<string, string> = {};
-    req.headers.forEach((value, key) => {
-      if (key !== 'host') {  // 排除host頭，避免衝突
-        headers[key] = value;
-      }
-    });
-    headers['Accept'] = 'application/json';
-    console.log('請求頭:', headers);
-    
-    // 轉發請求到後端
-    const response = await axios.get(url, { 
-      headers,
-      timeout: 10000  // 10秒超時
-    });
-    
-    console.log('後端回應狀態:', response.status);
-    console.log('後端回應數據:', response.data);
-    
-    // 返回後端的回應
-    return NextResponse.json(response.data, { status: response.status });
-  } catch (error: any) {
-    console.error('代理GET請求錯誤詳細信息:', error);
-    
-    // 提取並記錄更詳細的錯誤信息
-    let errorDetail = '未知錯誤';
-    let errorMessage = error.message || '未知錯誤信息';
-    let statusCode = 500;
-    
-    if (error.response) {
-      // 後端回應了錯誤
-      statusCode = error.response.status;
-      errorDetail = error.response.data?.detail || '請求處理失敗';
-      
-      console.error('錯誤狀態碼:', statusCode);
-      console.error('錯誤數據:', error.response.data);
-      console.error('請求配置:', {
-        url: error.config?.url,
-        method: error.config?.method,
-        params: error.config?.params
-      });
-    } else if (error.request) {
-      // 請求已發送但未收到回應
-      statusCode = 503;
-      errorDetail = '無法連接到後端服務器';
-      
-      console.error('未收到回應的請求:', error.request);
-      console.error('請求URL:', error.config?.url);
-    } else {
-      // 設置請求時發生錯誤
-      errorDetail = '請求處理失敗';
-      
-      console.error('其他錯誤:', errorMessage);
-      console.error('環境信息:', {
-        NODE_ENV: process.env.NODE_ENV,
-        API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL
-      });
+
+    // 加上搜尋參數
+    if (searchParams.toString()) {
+      url.search = searchParams.toString();
     }
-    
-    return NextResponse.json(
-      { 
-        detail: errorDetail, 
-        message: errorMessage,
-        timestamp: new Date().toISOString(),
-        debugInfo: {
-          status: statusCode,
-          url: error.config?.url,
-          method: error.config?.method,
-          requestId: req.headers.get('x-request-id') || 'unknown'
-        }
+
+    console.log(`[API Proxy] 發送 GET 請求至: ${url.toString()}`);
+
+    const res = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
       },
-      { status: statusCode }
-    );
+      cache: 'no-store',
+    });
+
+    if (!res.ok) {
+      console.error(`[API Proxy] 取得醫師列表錯誤: ${res.status} ${res.statusText}`);
+      return Response.json(
+        { error: `取得醫師列表失敗: ${res.statusText}` },
+        { status: res.status }
+      );
+    }
+
+    const data = await res.json();
+    return Response.json(data);
+  } catch (error: any) {
+    console.error('[API Proxy] 取得醫師列表錯誤:', error.message);
+    return Response.json({ error: '取得醫師列表時發生錯誤' }, { status: 500 });
   }
 }
 
@@ -94,84 +49,40 @@ export async function GET(req: NextRequest) {
  * 處理對 /api/v1/doctors 的POST請求
  * 代理到FastAPI後端服務
  */
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
     console.log('開始處理 /api/v1/doctors 的 POST 請求');
-    
+
     // 獲取請求體
-    const data = await req.json();
-    
-    // 使用統一函數獲取後端URL並添加路徑
+    const body = await request.json();
+
+    // 使用統一函數獲取後端URL
     const url = getBackendUrl('/doctors/');
-    
-    console.log('代理POST請求到:', url);
-    console.log('請求資料:', JSON.stringify(data, null, 2));
-    
-    // 收集並記錄原始請求頭
-    const headers: Record<string, string> = {};
-    req.headers.forEach((value, key) => {
-      if (key !== 'host') {  // 排除host頭，避免衝突
-        headers[key] = value;
-      }
+
+    console.log(`[API Proxy] 發送 POST 請求至: ${url.toString()}`);
+    console.log('[API Proxy] 醫師資料:', body);
+
+    const res = await fetch(url.toString(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
     });
-    headers['Content-Type'] = 'application/json';
-    console.log('請求頭:', headers);
-    
-    // 轉發請求到後端
-    const response = await axios.post(url, data, {
-      headers,
-      timeout: 10000  // 10秒超時
-    });
-    
-    console.log('後端回應狀態:', response.status);
-    console.log('後端回應數據:', response.data);
-    
-    // 返回後端的回應
-    return NextResponse.json(response.data, { status: response.status });
-  } catch (error: any) {
-    console.error('代理POST請求錯誤:', error.message);
-    
-    if (error.response) {
-      // 後端回應了錯誤
-      console.error('錯誤狀態碼:', error.response.status);
-      console.error('錯誤數據:', error.response.data);
-      return NextResponse.json(
-        { 
-          detail: error.response.data?.detail || '請求處理失敗',
-          message: error.message,
-          debugInfo: {
-            status: error.response.status,
-            url: error.config?.url,
-            method: error.config?.method,
-          }
-        },
-        { status: error.response.status }
-      );
-    } else if (error.request) {
-      // 請求已發送但未收到回應
-      console.error('未收到回應的請求:', error.request);
-      return NextResponse.json(
-        { 
-          detail: '無法連接到後端服務器',
-          message: error.message,
-          debugInfo: {
-            isConnectionError: true,
-            url: error.config?.url,
-            method: error.config?.method,
-          }
-        },
-        { status: 503 }
-      );
-    } else {
-      // 設置請求時發生錯誤
-      console.error('其他錯誤:', error.message);
-      return NextResponse.json(
-        { 
-          detail: '請求處理失敗',
-          message: error.message
-        },
-        { status: 500 }
+
+    if (!res.ok) {
+      console.error(`[API Proxy] 新增醫師錯誤: ${res.status} ${res.statusText}`);
+      const errorData = await res.json().catch(() => ({ detail: res.statusText }));
+      return Response.json(
+        { error: '新增醫師失敗', detail: errorData.detail },
+        { status: res.status }
       );
     }
+
+    const data = await res.json();
+    return Response.json(data);
+  } catch (error: any) {
+    console.error('[API Proxy] 建立醫師資料錯誤:', error.message);
+    return Response.json({ error: '建立醫師資料時發生錯誤' }, { status: 500 });
   }
 } 

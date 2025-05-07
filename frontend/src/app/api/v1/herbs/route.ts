@@ -8,7 +8,7 @@ export async function GET(
   request: NextRequest,
 ) {
   // 從請求中獲取查詢參數
-  const searchParams = request.nextUrl.searchParams;
+  const { searchParams } = request.nextUrl;
   const searchQuery = searchParams.get('search') || '';
   const isCompound = searchParams.get('is_compound');
   const skip = searchParams.get('skip') || '0';

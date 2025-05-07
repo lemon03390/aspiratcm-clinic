@@ -58,6 +58,15 @@ interface Appointment {
 
 type ActionType = "new" | "reschedule" | "followup" | "edit" | null;
 
+interface Tag {
+  id: number;
+  name: string;
+  description: string | null;
+  color: string;
+  icon: string | null;
+  is_active: boolean;
+}
+
 // 在 AppointmentsPage 元件中添加日期渲染函數
 const renderDayContents = (day: number, date: Date) => {
   // 檢查是否為香港假期
@@ -318,10 +327,61 @@ export default function AppointmentsPage() {
     fetchAppointments();
   }, 2000);
 
+  const [tags, setTags] = useState<Tag[]>([]);
+
+  // 獲取自訂標籤
+  const fetchTags = async () => {
+    try {
+      console.log("開始獲取標籤資料...");
+      console.log(`API基礎URL: ${process.env.NEXT_PUBLIC_API_BASE_URL}`);
+
+      // 添加超時和額外請求頭
+      const response = await axios.get(getBackendUrl("/tag-settings"), {
+        timeout: 10000,
+        headers: {
+          'X-Request-ID': `tags-${Date.now()}`,
+          'Cache-Control': 'no-cache'
+        }
+      });
+
+      console.log(`標籤獲取成功，HTTP狀態: ${response.status}`);
+      console.log(`標籤數據: ${JSON.stringify(response.data)}`);
+
+      if (Array.isArray(response.data)) {
+        setTags(response.data.filter((tag: Tag) => tag.is_active));
+        console.log(`已設置${response.data.filter((tag: Tag) => tag.is_active).length}個活動標籤`);
+      } else {
+        console.error("標籤資料不是陣列格式:", response.data);
+        setTags([]);
+      }
+    } catch (err: any) {
+      console.error("獲取標籤失敗, 完整錯誤:", err);
+
+      if (err.response) {
+        // 伺服器回應了錯誤
+        console.error(`標籤API回應錯誤 ${err.response.status}: ${JSON.stringify(err.response.data)}`);
+      } else if (err.request) {
+        // 請求發送但沒收到回應
+        console.error("標籤API請求超時或無回應:", err.request);
+      } else {
+        // 請求設置出錯
+        console.error("標籤API請求設置錯誤:", err.message);
+      }
+
+      // 使用默認標籤而不是完全無標籤
+      setTags([
+        { id: 1, name: "麻煩症", description: "需要特別處理的患者", color: "red", icon: "warning", is_active: true },
+        { id: 2, name: "傳染病", description: "可能傳染給他人的疾病", color: "yellow", icon: "virus", is_active: true }
+      ]);
+      console.log("已設置默認標籤作為備用");
+    }
+  };
+
   useEffect(() => {
     fetchDoctors();
     fetchAppointments();
     fetchReferralSources();
+    fetchTags(); // 獲取自訂標籤
 
     // 設置自動刷新（每10分鐘）- 降低頻率以減少伺服器負載
     const intervalId = setInterval(
@@ -1362,6 +1422,65 @@ export default function AppointmentsPage() {
     );
   }
 
+  // 獲取標籤的顏色樣式
+  const getTagStyle = (tagName: string) => {
+    const tag = tags.find(t => t.name === tagName);
+    if (!tag) {
+      // 默認樣式
+      return {
+        bg: "bg-gray-100",
+        text: "text-gray-800",
+        border: "border-gray-200"
+      };
+    }
+
+    // 根據標籤色彩返回對應的樣式類
+    switch (tag.color) {
+      case "red":
+        return {
+          bg: "bg-red-100",
+          text: "text-red-800",
+          border: "border-red-200"
+        };
+      case "yellow":
+        return {
+          bg: "bg-yellow-100",
+          text: "text-yellow-800",
+          border: "border-yellow-200"
+        };
+      case "blue":
+        return {
+          bg: "bg-blue-100",
+          text: "text-blue-800",
+          border: "border-blue-200"
+        };
+      case "green":
+        return {
+          bg: "bg-green-100",
+          text: "text-green-800",
+          border: "border-green-200"
+        };
+      case "purple":
+        return {
+          bg: "bg-purple-100",
+          text: "text-purple-800",
+          border: "border-purple-200"
+        };
+      case "indigo":
+        return {
+          bg: "bg-indigo-100",
+          text: "text-indigo-800",
+          border: "border-indigo-200"
+        };
+      default:
+        return {
+          bg: "bg-gray-100",
+          text: "text-gray-800",
+          border: "border-gray-200"
+        };
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       {renderPageHeader()}
@@ -1630,22 +1749,27 @@ export default function AppointmentsPage() {
                                               舊症
                                             </span>
                                           )}
-                                          {appointment.is_troublesome === 1 && (
-                                            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800 border border-red-200">
-                                              <svg className="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                              </svg>
-                                              麻煩症
-                                            </span>
-                                          )}
-                                          {appointment.is_contagious === 1 && (
-                                            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
-                                              <svg className="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
-                                              </svg>
-                                              傳染病
-                                            </span>
-                                          )}
+                                          {/* 動態顯示自訂標籤 */}
+                                          {tags.map(tag => {
+                                            // 根據標籤名稱獲取對應的屬性值
+                                            const tagProperty = `is_${tag.name.toLowerCase().replace(/\s+/g, '_')}` as keyof Appointment;
+                                            const hasTag = appointment[tagProperty] === 1;
+
+                                            if (hasTag ||
+                                              (tag.name === "麻煩症" && appointment.is_troublesome === 1) ||
+                                              (tag.name === "傳染病" && appointment.is_contagious === 1)) {
+                                              const tagStyle = getTagStyle(tag.name);
+                                              return (
+                                                <span
+                                                  key={tag.id}
+                                                  className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${tagStyle.bg} ${tagStyle.text} border ${tagStyle.border}`}
+                                                >
+                                                  {tag.name}
+                                                </span>
+                                              );
+                                            }
+                                            return null;
+                                          })}
                                         </div>
                                       </div>
 

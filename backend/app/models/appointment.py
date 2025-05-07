@@ -27,4 +27,7 @@ class Appointment(Base):
     related_appointment = relationship("Appointment", remote_side=[id], backref="follow_up_appointments")
     
     # 關聯醫療記錄
-    medical_record = relationship("MedicalRecord", back_populates="appointment", uselist=False) 
+    medical_record = relationship("MedicalRecord", back_populates="appointment", uselist=False)
+    
+    # 關聯標籤
+    tags = relationship("AppointmentTag", back_populates="appointment", cascade="all, delete-orphan") 

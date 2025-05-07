@@ -1,15 +1,15 @@
 "use client";
-import { useState, useEffect } from "react";
 import axios from "axios";
-import { format } from "date-fns";
+import { useEffect, useState } from "react";
 import {
-  consultationTypes,
   ConsultationType,
+  consultationTypes,
 } from "../../constants/consultationTypes";
-import { getBackendUrl, ErrorHandler } from "../../libs/apiClient";
-import { normalizeSchedule, formatScheduleForDisplay, isDayInSchedule } from "../../utils/scheduleFormatter";
-import { formatConsultationTypeForBackend, ExtendedConsultationType } from "../../utils/consultationTypeFormatter";
+import { ErrorHandler, getBackendUrl } from "../../libs/apiClient";
+import { ExtendedConsultationType, formatConsultationTypeForBackend } from "../../utils/consultationTypeFormatter";
+import { formatScheduleForDisplay, isDayInSchedule } from "../../utils/scheduleFormatter";
 import { toISOString } from "../../utils/timeFormatter";
+import PatientTags, { TagType } from './PatientTags';
 
 interface Doctor {
   id: number;
@@ -40,7 +40,8 @@ export default function NewAppointmentForm({
     } as AppointmentConsultationType,
     is_first_time: false,
     is_troublesome: false,
-    is_contagious: false
+    is_contagious: false,
+    tagIds: [] as number[]
   });
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
@@ -49,6 +50,7 @@ export default function NewAppointmentForm({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [availableTags, setAvailableTags] = useState<TagType[]>([]);
 
   useEffect(() => {
     if (doctors.length > 0 && !appointmentData.doctor_name) {
@@ -73,6 +75,11 @@ export default function NewAppointmentForm({
       });
     }
   }, [appointmentData.consultation_type.id]);
+
+  useEffect(() => {
+    // 確保標籤數據在組件掛載時及其他必要時機獲取
+    // 此處可能需要添加其他依賴項
+  }, []);
 
   const hours = Array.from({ length: 12 }, (_, i) => i + 9).map((h) =>
     h.toString().padStart(2, "0"),
@@ -177,7 +184,8 @@ export default function NewAppointmentForm({
           consultation_type: consultationTypeObj,
           is_first_time: appointmentData.is_first_time ? 1 : 0,
           is_troublesome: appointmentData.is_troublesome ? 1 : 0,
-          is_contagious: appointmentData.is_contagious ? 1 : 0
+          is_contagious: appointmentData.is_contagious ? 1 : 0,
+          tag_ids: appointmentData.tagIds
         },
         {
           headers: {
@@ -195,7 +203,8 @@ export default function NewAppointmentForm({
           consultation_type: { ...consultationTypes[0] },
           is_first_time: false,
           is_troublesome: false,
-          is_contagious: false
+          is_contagious: false,
+          tagIds: []
         });
         setSelectedDate(new Date());
         setSelectedHour("10");
@@ -232,6 +241,26 @@ export default function NewAppointmentForm({
 
   const selectedDoctorSchedule =
     doctors.find((d) => d.name === appointmentData.doctor_name)?.schedule || [];
+
+  // 新增一個函數處理標籤模式變化
+  const processTagSelections = (tagIds: number[]) => {
+    console.log('選擇的標籤IDs:', tagIds);
+    console.log('可用標籤:', availableTags);
+
+    // 檢查特殊標籤
+    const firstTimeTag = availableTags.find(tag => tag.name.includes('首次'));
+    const troublesomeTag = availableTags.find(tag => tag.name.includes('麻煩'));
+    const contagiousTag = availableTags.find(tag => tag.name.includes('傳染'));
+
+    setAppointmentData({
+      ...appointmentData,
+      tagIds,
+      // 只有在找到對應標籤時才設定布爾值
+      is_first_time: firstTimeTag ? tagIds.includes(firstTimeTag.id) : false,
+      is_troublesome: troublesomeTag ? tagIds.includes(troublesomeTag.id) : false,
+      is_contagious: contagiousTag ? tagIds.includes(contagiousTag.id) : false
+    });
+  };
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
@@ -279,64 +308,17 @@ export default function NewAppointmentForm({
               />
               <p className="text-xs text-gray-500 mt-1">至少8位數字</p>
             </div>
-            
+
             {/* 患者標記 */}
             <div className="md:col-span-2 mt-3">
-              <div className="flex flex-wrap gap-4">
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="is_first_time"
-                    checked={appointmentData.is_first_time}
-                    onChange={(e) => 
-                      setAppointmentData({
-                        ...appointmentData,
-                        is_first_time: e.target.checked
-                      })
-                    }
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                  />
-                  <label htmlFor="is_first_time" className="ml-2 block text-sm text-gray-700">
-                    首次求診
-                  </label>
-                </div>
-                
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="is_troublesome"
-                    checked={appointmentData.is_troublesome}
-                    onChange={(e) => 
-                      setAppointmentData({
-                        ...appointmentData,
-                        is_troublesome: e.target.checked
-                      })
-                    }
-                    className="h-4 w-4 text-yellow-600 focus:ring-yellow-500 border-gray-300 rounded"
-                  />
-                  <label htmlFor="is_troublesome" className="ml-2 block text-sm text-gray-700">
-                    麻煩症患者
-                  </label>
-                </div>
-                
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="is_contagious"
-                    checked={appointmentData.is_contagious}
-                    onChange={(e) => 
-                      setAppointmentData({
-                        ...appointmentData,
-                        is_contagious: e.target.checked
-                      })
-                    }
-                    className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
-                  />
-                  <label htmlFor="is_contagious" className="ml-2 block text-sm text-gray-700">
-                    傳染病患者
-                  </label>
-                </div>
-              </div>
+              <PatientTags
+                selectedTags={appointmentData.tagIds}
+                onChange={processTagSelections}
+                onTagsLoaded={(tags) => {
+                  console.log('標籤加載完成:', tags);
+                  setAvailableTags(tags);
+                }}
+              />
             </div>
           </div>
         </div>
@@ -395,7 +377,7 @@ export default function NewAppointmentForm({
                         ...selectedType,
                         selectedSubType:
                           selectedType.subTypes &&
-                          selectedType.subTypes.length > 0
+                            selectedType.subTypes.length > 0
                             ? selectedType.subTypes[0]
                             : undefined,
                       },

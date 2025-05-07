@@ -1,7 +1,7 @@
 "use client";
-import React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 // 導航項目類型
 interface NavItem {
@@ -14,7 +14,25 @@ interface NavItem {
 
 export default function DashboardPage() {
   const router = useRouter();
-  
+  const [memberCount, setMemberCount] = useState<number>(0);
+
+  // 載入會員數量統計
+  useEffect(() => {
+    const fetchMemberCount = async () => {
+      try {
+        const response = await fetch('/api/v1/members?limit=1');
+        if (response.ok) {
+          const data = await response.json();
+          setMemberCount(data.total || 0);
+        }
+      } catch (error) {
+        console.error('獲取會員數量失敗', error);
+      }
+    };
+
+    fetchMemberCount();
+  }, []);
+
   // 導航項目列表
   const navItems: NavItem[] = [
     {
@@ -23,6 +41,13 @@ export default function DashboardPage() {
       path: '/appointments',
       icon: 'M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5',
       bgColor: 'bg-blue-500'
+    },
+    {
+      title: '診所會員',
+      description: '管理診所會員資料，查詢會員信息，登記持卡會員',
+      path: '/member',
+      icon: 'M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm1.294 6.336a6.721 6.721 0 01-3.17.789 6.721 6.721 0 01-3.168-.789 3.376 3.376 0 016.338 0z',
+      bgColor: 'bg-yellow-500'
     },
     {
       title: '患者登記',
@@ -121,7 +146,7 @@ export default function DashboardPage() {
 
         <div className="mt-12 p-6 bg-white rounded-lg shadow-md">
           <h2 className="text-2xl font-semibold text-gray-800 mb-4">系統概覽</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <h3 className="text-lg font-medium text-blue-700 mb-2">今日預約</h3>
               <div className="text-3xl font-bold text-blue-900">12</div>
@@ -130,10 +155,42 @@ export default function DashboardPage() {
               <h3 className="text-lg font-medium text-green-700 mb-2">新患者</h3>
               <div className="text-3xl font-bold text-green-900">5</div>
             </div>
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <h3 className="text-lg font-medium text-yellow-700 mb-2">註冊會員</h3>
+              <div className="text-3xl font-bold text-yellow-900">{memberCount}</div>
+              <Link href="/member" className="text-sm text-yellow-600 hover:underline block mt-2">
+                查看全部會員
+              </Link>
+            </div>
             <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
               <h3 className="text-lg font-medium text-purple-700 mb-2">已完成就診</h3>
               <div className="text-3xl font-bold text-purple-900">8</div>
             </div>
+          </div>
+        </div>
+
+        {/* 批量管理區域 */}
+        <div className="mt-8 p-6 bg-white rounded-lg shadow-md">
+          <h2 className="text-2xl font-semibold text-gray-800 mb-4">批量管理工具</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Link href="/member?mode=import" className="p-4 border border-yellow-300 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors duration-200 flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-yellow-600 mr-3">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+              </svg>
+              <div>
+                <h3 className="text-lg font-medium text-yellow-700">批量導入會員</h3>
+                <p className="text-gray-600">通過 CSV 檔案批量導入會員資料</p>
+              </div>
+            </Link>
+            <Link href="/appointments/capacity" className="p-4 border border-blue-300 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors duration-200 flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-blue-600 mr-3">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008zM9.75 15h.008v.008H9.75V15zm0 2.25h.008v.008H9.75v-.008zM7.5 15h.008v.008H7.5V15zm0 2.25h.008v.008H7.5v-.008zm6.75-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H16.5v-.008zm0 2.25h.008v.008H16.5V15z" />
+              </svg>
+              <div>
+                <h3 className="text-lg font-medium text-blue-700">預約容量設定</h3>
+                <p className="text-gray-600">設定每日預約容量與時段</p>
+              </div>
+            </Link>
           </div>
         </div>
       </div>

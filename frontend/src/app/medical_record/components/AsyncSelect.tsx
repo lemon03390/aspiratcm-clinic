@@ -1,4 +1,4 @@
-import { debounce } from 'lodash';
+import debounce from 'lodash/debounce';
 import React, { useCallback, useEffect, useState } from 'react';
 
 export interface SelectOption {

@@ -11,9 +11,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-@router.get("/by-phone/{phone_number}")
-async def get_appointment_by_phone(phone_number: str, db: Session = Depends(get_db)):
-    """根據電話號碼查詢預約"""
+async def get_appointments_by_phone_number(phone_number: str, db: Session):
+    """根據電話號碼查詢預約的實現函數"""
     try:
         # 使用預約查詢語句並添加電話號碼條件
         query = text("""
@@ -40,7 +39,12 @@ async def get_appointment_by_phone(phone_number: str, db: Session = Depends(get_
         logger.error(f"按電話號碼查詢預約時出錯: {str(e)}")
         if isinstance(e, HTTPException):
             raise e
-        raise HTTPException(status_code=500, detail=f"按電話號碼查詢預約時出錯: {str(e)}") from e 
+        raise HTTPException(status_code=500, detail=f"按電話號碼查詢預約時出錯: {str(e)}") from e
+
+@router.get("/by-phone/{phone_number}")
+async def get_appointment_by_phone(phone_number: str, db: Session = Depends(get_db)):
+    """根據電話號碼查詢預約"""
+    return await get_appointments_by_phone_number(phone_number, db)
 
 @router.get("/by-phone")
 async def get_appointment_by_phone_query(request: Request, phone_number: str = Query(..., description="患者電話號碼"), db: Session = Depends(get_db)):

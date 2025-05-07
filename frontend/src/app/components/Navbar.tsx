@@ -13,6 +13,7 @@ export default function Navbar() {
   const navItems: NavItem[] = [
     { href: "/dashboard", label: "儀表板" },
     { href: "/appointments", label: "預約管理" },
+    { href: "/member", label: "診所會員" },
     { href: "/patient_registration", label: "患者登記" },
     { href: "/medical_record", label: "病歷系統" },
     { href: "/admin/settings", label: "設定管理" },
@@ -48,11 +49,10 @@ export default function Navbar() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`inline-flex items-center px-3 py-2 border-b-2 text-sm font-medium leading-5 transition duration-150 ease-in-out ${
-                  pathname === item.href
-                    ? "border-blue-500 text-blue-600 focus:outline-none focus:border-blue-700"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 focus:outline-none focus:text-gray-700 focus:border-gray-300"
-                }`}
+                className={`inline-flex items-center px-3 py-2 border-b-2 text-sm font-medium leading-5 transition duration-150 ease-in-out ${pathname === item.href
+                  ? "border-blue-500 text-blue-600 focus:outline-none focus:border-blue-700"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 focus:outline-none focus:text-gray-700 focus:border-gray-300"
+                  }`}
               >
                 {item.label}
               </Link>

@@ -8,6 +8,14 @@ from .herbs import (
     InventoryCheckResponse
 )
 
+from .membership import (
+    Membership,
+    MembershipBase,
+    MembershipCreate,
+    MembershipUpdate,
+    MembershipList
+)
+
 __all__ = [
     "HerbBase",
     "HerbCreate",
@@ -15,5 +23,10 @@ __all__ = [
     "HerbInDB",
     "HerbSearchResponse",
     "InventoryCheckRequest",
-    "InventoryCheckResponse"
+    "InventoryCheckResponse",
+    "Membership",
+    "MembershipBase",
+    "MembershipCreate",
+    "MembershipUpdate",
+    "MembershipList"
 ] 
