@@ -16,6 +16,14 @@ from .membership import (
     MembershipList
 )
 
+from .member_plan import (
+    MemberPlan,
+    MemberPlanBase,
+    MemberPlanCreate,
+    MemberPlanUpdate,
+    MemberPlanList
+)
+
 __all__ = [
     "HerbBase",
     "HerbCreate",
@@ -28,5 +36,10 @@ __all__ = [
     "MembershipBase",
     "MembershipCreate",
     "MembershipUpdate",
-    "MembershipList"
+    "MembershipList",
+    "MemberPlan",
+    "MemberPlanBase",
+    "MemberPlanCreate",
+    "MemberPlanUpdate",
+    "MemberPlanList"
 ] 

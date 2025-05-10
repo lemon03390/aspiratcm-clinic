@@ -13,7 +13,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.core.config import settings
+from app.core.settings import settings
 from app.models.membership import Membership
 from app.models.membership_account import MembershipAccountBalance, MembershipAccountLog
 
@@ -22,16 +22,16 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # 建立資料庫連接
-SQLALCHEMY_DATABASE_URL = settings.SQLALCHEMY_DATABASE_URI
+SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # CSV 文件路徑
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 FRONTEND_DATA_DIR = os.path.join(BASE_DIR, "frontend", "public", "data")
-MEMBERSHIPS_CSV = os.path.join(FRONTEND_DATA_DIR, "memberships.csv")
-BALANCES_CSV = os.path.join(FRONTEND_DATA_DIR, "membership_account_balances.csv")
-LOGS_CSV = os.path.join(FRONTEND_DATA_DIR, "membership_account_logs.csv")
+MEMBERSHIPS_CSV = "/app/frontend/public/data/memberships.csv"
+BALANCES_CSV = "/app/frontend/public/data/membership_account_balances.csv"
+LOGS_CSV = "/app/frontend/public/data/membership_account_logs.csv"
 
 
 def read_csv(file_path: str) -> List[Dict[str, Any]]:

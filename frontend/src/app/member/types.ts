@@ -9,6 +9,7 @@ export interface Member {
     haveCard: boolean;
     created_at: string;
     updated_at: string;
+    patient_id?: number | null;
 
     // 向後兼容舊界面的字段映射
     name?: string;
@@ -32,4 +33,78 @@ export interface MemberFormData {
     hkid?: string;
     termsConsent?: boolean;
     haveCard?: boolean;
-} 
+}
+
+// 會員餘額類型
+export interface MemberBalance {
+    id: number;
+    membership_id: number;
+    storedValue: number;
+    giftedValue: number;
+    created_at: string;
+    updated_at: string;
+}
+
+// 會員交易記錄類型
+export interface MemberTransaction {
+    id: number;
+    membership_id: number;
+    amount: number;
+    giftAmount: number;
+    type: string;
+    description: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface MemberTransactionList {
+    logs: MemberTransaction[];
+    total: number;
+}
+
+// 會員增值請求類型
+export interface MemberTopUpRequest {
+    amount: number;
+    gift_amount: number;
+    plan_id?: number;
+}
+
+// 會員消費請求類型
+export interface MemberSpendRequest {
+    amount: number;
+}
+
+// 會員增值計劃類型 (舊API)
+export interface MemberTopUpPlan {
+    id: number;
+    name: string;
+    stored_value: number;
+    gifted_value: number;
+    is_active: boolean;
+    display_order: number;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface MemberTopUpPlanList {
+    items: MemberTopUpPlan[];
+    total: number;
+}
+
+// 新的會員增值計劃類型 (新API)
+export interface MemberPlan {
+    id: number;
+    name: string;
+    description: string | null;
+    base_amount: number;
+    bonus_amount: number;
+    is_active: boolean;
+    sort_order: number;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface MemberPlanList {
+    items: MemberPlan[];
+    total: number;
+}

@@ -5,6 +5,7 @@ from app.api.v1.endpoints import settings, herbs, ai_recommendations
 from app.api.v1.endpoints import patients, tag_settings
 from app.api.v1.endpoints import memberships
 from app.api.v1.endpoints import file_import
+from app.api.v1.endpoints import member_plans
 
 api_router = APIRouter()
 
@@ -16,4 +17,5 @@ api_router.include_router(ai_recommendations.router, prefix="/ai", tags=["ai"])
 api_router.include_router(patients.router, prefix="/patients", tags=["patients"])
 api_router.include_router(tag_settings.router, prefix="/tag-settings", tags=["tag-settings"])
 api_router.include_router(memberships.router, prefix="/memberships", tags=["memberships"])
-api_router.include_router(file_import.router, prefix="/file", tags=["file-import"]) 
+api_router.include_router(file_import.router, prefix="/file", tags=["file-import"])
+api_router.include_router(member_plans.router, prefix="/member-plans", tags=["member-plans"]) 

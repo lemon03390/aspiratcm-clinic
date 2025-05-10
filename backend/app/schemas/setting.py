@@ -1,5 +1,6 @@
 from typing import List, Optional
 from pydantic import BaseModel, Field
+from datetime import datetime
 
 
 class TcmSettingBase(BaseModel):
@@ -49,4 +50,43 @@ class CategoryEnum:
     TCM_TREATMENT_RULE = "tcm_treatment_rule"
     TCM_TREATMENT_METHOD = "tcm_treatment_method"
     TCM_SINGLE_HERB = "tcm_single_herb"
-    REFERRAL_SOURCE = "referral_source"  # 介紹人來源 
+    REFERRAL_SOURCE = "referral_source"  # 介紹人來源
+
+
+# --- 會員增值計劃設置 ---
+class MemberTopUpPlanBase(BaseModel):
+    name: str
+    stored_value: int
+    gifted_value: int
+    is_active: bool = True
+    display_order: int = 0
+
+
+class MemberTopUpPlanCreate(MemberTopUpPlanBase):
+    pass
+
+
+class MemberTopUpPlanUpdate(BaseModel):
+    name: Optional[str] = None
+    stored_value: Optional[int] = None
+    gifted_value: Optional[int] = None
+    is_active: Optional[bool] = None
+    display_order: Optional[int] = None
+
+
+class MemberTopUpPlanInDBBase(MemberTopUpPlanBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MemberTopUpPlan(MemberTopUpPlanInDBBase):
+    pass
+
+
+class MemberTopUpPlanList(BaseModel):
+    items: List[MemberTopUpPlan]
+    total: int 

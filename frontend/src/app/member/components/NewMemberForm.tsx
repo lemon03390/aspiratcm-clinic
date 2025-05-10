@@ -2,12 +2,14 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { createMember } from '../services/memberService';
+import { MemberFormData } from '../types';
 
 const NewMemberForm = () => {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<MemberFormData>({
         patientName: '',
         phoneNumber: '',
         hkid: '',
@@ -31,19 +33,8 @@ const NewMemberForm = () => {
         setError('');
 
         try {
-            const response = await fetch('/api/v1/members', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(formData),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || '建立會員時發生錯誤');
-            }
-
+            // 使用服務函數來創建會員
+            await createMember(formData);
             // 導航到會員列表頁面
             router.push('/member');
         } catch (err: any) {

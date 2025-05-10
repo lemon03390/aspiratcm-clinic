@@ -11,6 +11,7 @@ from app.models.appointment_slot import AppointmentSlot
 from app.models.tag_type import TagType
 from app.models.appointment_tag import AppointmentTag
 from app.models.membership import Membership
+from app.models.member_plan import MemberPlan
 
 
 
@@ -28,5 +29,6 @@ __all__ = [
     'AppointmentSlot',
     'TagType',
     'AppointmentTag',
-    'Membership'
+    'Membership',
+    'MemberPlan'
 ]

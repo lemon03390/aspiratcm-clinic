@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Any
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy.orm import Session
 import logging
@@ -12,6 +12,8 @@ from app.schemas.setting import (
     TcmSettingFull,
     CategoryEnum
 )
+from app import crud, schemas
+from app.api import deps
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -223,3 +225,77 @@ async def batch_import_settings(
         db.rollback()
         logger.error(f"批量導入設定失敗: {str(e)}")
         raise HTTPException(status_code=500, detail=f"批量導入失敗: {str(e)}") from e 
+
+# ----- 會員增值計劃設置端點 -----
+
+@router.get("/member-topup-plans", response_model=schemas.setting.MemberTopUpPlanList)
+def read_member_topup_plans(
+    db: Session = Depends(deps.get_db),
+    skip: int = 0,
+    limit: int = 100,
+    show_inactive: bool = False,
+) -> Any:
+    """
+    獲取會員增值計劃列表。
+    """
+    if show_inactive:
+        return crud.member_topup_plan.get_all_plans(db, skip=skip, limit=limit)
+    return crud.member_topup_plan.get_active_plans(db, skip=skip, limit=limit)
+
+
+@router.post("/member-topup-plans", response_model=schemas.setting.MemberTopUpPlan)
+def create_member_topup_plan(
+    *,
+    db: Session = Depends(deps.get_db),
+    plan_in: schemas.setting.MemberTopUpPlanCreate,
+) -> Any:
+    """
+    創建新的增值計劃。
+    """
+    return crud.member_topup_plan.create(db, obj_in=plan_in)
+
+
+@router.get("/member-topup-plans/{id}", response_model=schemas.setting.MemberTopUpPlan)
+def read_member_topup_plan(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: int,
+) -> Any:
+    """
+    獲取指定ID的增值計劃。
+    """
+    if plan := crud.member_topup_plan.get(db, id=id):
+        return plan
+    else:
+        raise HTTPException(status_code=404, detail="增值計劃不存在")
+
+
+@router.put("/member-topup-plans/{id}", response_model=schemas.setting.MemberTopUpPlan)
+def update_member_topup_plan(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: int,
+    plan_in: schemas.setting.MemberTopUpPlanUpdate,
+) -> Any:
+    """
+    更新指定ID的增值計劃。
+    """
+    if plan := crud.member_topup_plan.get(db, id=id):
+        return crud.member_topup_plan.update(db, db_obj=plan, obj_in=plan_in)
+    else:
+        raise HTTPException(status_code=404, detail="增值計劃不存在")
+
+
+@router.delete("/member-topup-plans/{id}", response_model=schemas.setting.MemberTopUpPlan)
+def delete_member_topup_plan(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: int,
+) -> Any:
+    """
+    刪除指定ID的增值計劃。
+    """
+    if plan := crud.member_topup_plan.get(db, id=id):
+        return crud.member_topup_plan.remove(db, id=id)
+    else:
+        raise HTTPException(status_code=404, detail="增值計劃不存在") 
